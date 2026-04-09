@@ -10,10 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.almstead.arboristdog",
-      "config": {
-        "googleMapsApiKey": "AIzaSyBdfbfAY2hChDlXPtD122WaDUn6Q1_CqsM"
-      }
+      "bundleIdentifier": "com.almstead.arboristdog"
     },
     "android": {
       "package": "com.almstead.arboristdog",
@@ -21,15 +18,10 @@
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "monochromeImage": "./assets/images/android-icon-foreground.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyBdfbfAY2hChDlXPtD122WaDUn6Q1_CqsM"
-        }
-      }
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
