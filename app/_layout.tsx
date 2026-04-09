@@ -1,16 +1,79 @@
 import { useEffect, useState } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '../stores/authStore';
+import { useCreditStore } from '../stores/creditStore';
+import { initAnalytics } from '../services/analytics';
+import { initPurchases } from '../services/purchases';
+import { supabase } from '../services/supabase';
 
 export default function RootLayout() {
-  const { user } = useAuthStore();
+  const { user, isLoading, setUser, setLoading } = useAuthStore();
+  const { setCredits } = useCreditStore();
   const segments = useSegments();
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
+    // Initialize external services
+    initAnalytics();
+    initPurchases();
+    
+    // Check for active session
+    checkUser();
+
+    // Listen for auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
+
+  const checkUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      fetchProfile(session.user.id);
+    } else {
+      setUser(null);
+    }
+  };
+
+  const fetchProfile = async (userId: string) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (data && !error) {
+      setUser(data);
+      // Also fetch credits
+      fetchCredits(userId);
+    } else {
+      console.error("Error fetching profile:", error);
+      setUser(null);
+    }
+  };
+
+  const fetchCredits = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_credits')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (data && !error) {
+      setCredits(data.balance);
+    }
+  };
 
   useEffect(() => {
     if (!isMounted) return;
@@ -30,7 +93,7 @@ export default function RootLayout() {
     }
   }, [user, segments, isMounted]);
 
-  if (!isMounted) return null;
+  if (!isMounted || isLoading) return null;
 
   return <Slot />;
 }

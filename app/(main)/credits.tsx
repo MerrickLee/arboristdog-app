@@ -5,16 +5,62 @@ import { COLORS } from '../../constants/theme';
 import { BackArrow, TreeRingPaw } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { useCreditStore } from '../../stores/creditStore';
+import { useAuthStore } from '../../stores/authStore';
+import { getAvailableOfferings, purchasePackage, restorePurchases } from '../../services/purchases';
+import { syncPurchasedCredits } from '../../services/credits';
+import { Alert, ActivityIndicator } from 'react-native';
 
 export default function CreditsScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const { creditsRemaining, addCredits } = useCreditStore();
   const [purchased, setPurchased] = useState(false);
+  const [offering, setOffering] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
-  const handlePurchase = () => {
-    // Mock purchase flow
-    addCredits(3);
-    setPurchased(true);
+  React.useEffect(() => {
+    fetchOfferings();
+  }, []);
+
+  const fetchOfferings = async () => {
+    const currentOffering = await getAvailableOfferings();
+    setOffering(currentOffering);
+    setLoading(false);
+  };
+
+  const handlePurchase = async (pack: any) => {
+    if (!user) return;
+    
+    setProcessing(true);
+    const response = await purchasePackage(pack);
+    
+    if (response.success) {
+      // Determine credit amount from metadata or package identifier
+      // For this app, we'll look for 'credit_count' in metadata or fallback to 3
+      const amount = pack.packageType === 'MONTHLY' ? 10 : (pack.product.metadata?.credit_count || 3);
+      
+      const sync = await syncPurchasedCredits(user.id, amount);
+      if (sync.success) {
+        addCredits(amount);
+        setPurchased(true);
+      } else {
+        Alert.alert("Success, but...", "Payment was successful, but we had trouble syncing your credits. Please try 'Restore Purchases'.");
+      }
+    } else if (!response.cancelled) {
+      Alert.alert("Purchase failed", response.error || "Something went wrong.");
+    }
+    setProcessing(false);
+  };
+
+  const handleRestore = async () => {
+    setProcessing(true);
+    const response = await restorePurchases();
+    if (response.success) {
+      Alert.alert("Check Complete", "Your purchases have been verified and synced.");
+      // In a real app, you'd re-fetch the latest balance from Supabase here
+    }
+    setProcessing(false);
   };
 
   if (purchased) {
@@ -48,28 +94,37 @@ export default function CreditsScreen() {
           <Text style={styles.balanceSub}>Resets May 1, 2026</Text>
         </View>
 
-        <View style={styles.packCard}>
-          <View style={styles.bestValueBadge}>
-            <Text style={styles.bestValueText}>BEST VALUE</Text>
-          </View>
-          <View style={styles.packHeader}>
-            <View>
-              <Text style={styles.packTitle}>3 Credits</Text>
-              <Text style={styles.packSub}>3 additional diagnostic scans</Text>
+        {loading ? (
+          <ActivityIndicator color={COLORS.leafAccent} />
+        ) : offering && (
+          offering.availablePackages.map((pack: any) => (
+            <View key={pack.identifier} style={styles.packCard}>
+              <View style={styles.bestValueBadge}>
+                <Text style={styles.bestValueText}>POPULAR</Text>
+              </View>
+              <View style={styles.packHeader}>
+                <View>
+                  <Text style={styles.packTitle}>{pack.product.title}</Text>
+                  <Text style={styles.packSub}>{pack.product.description}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.packPrice}>{pack.product.priceString}</Text>
+                </View>
+              </View>
+              
+              <Button 
+                disabled={processing}
+                onPress={() => handlePurchase(pack)}
+              >
+                {processing ? "Processing..." : `Buy Now`}
+              </Button>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.packPrice}>$1</Text>
-              <Text style={styles.packPriceSub}>one-time</Text>
-            </View>
-          </View>
-          
-          <TouchableOpacity style={styles.applePayBtn} onPress={handlePurchase}>
-            <Text style={styles.applePayText}>Buy with Apple Pay</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.googlePayBtn} onPress={handlePurchase}>
-            <Text style={styles.googlePayText}>Google Pay</Text>
-          </TouchableOpacity>
-        </View>
+          ))
+        )}
+
+        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
+          <Text style={styles.restoreText}>Restore Purchases</Text>
+        </TouchableOpacity>
 
         <View style={styles.almsteadCta}>
           <View style={styles.ctaIcon}>
@@ -273,5 +328,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginVertical: 16,
     marginBottom: 32,
+  },
+  restoreBtn: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  restoreText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
 });

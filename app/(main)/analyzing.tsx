@@ -4,6 +4,10 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { TreeRingPaw, CheckIcon } from '../../components/ui/Icons';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { useAuthStore } from '../../stores/authStore';
+import { useCreditStore } from '../../stores/creditStore';
+import { performAnalysis } from '../../services/analysis';
+import { Alert } from 'react-native';
 
 const STEPS = [
   "Analyzing image...",
@@ -14,7 +18,16 @@ const STEPS = [
 
 export default function AnalyzingScreen() {
   const router = useRouter();
-  const { setResult } = useDiagnosisStore();
+  const { user } = useAuthStore();
+  const { deductCredit } = useCreditStore();
+  const { 
+    capturedImage, 
+    selectedTags, 
+    description, 
+    location,
+    setResult,
+    setRemoteImageUrl
+  } = useDiagnosisStore();
   const [currentStep, setCurrentStep] = useState(0);
   const pulseAnim = useState(new Animated.Value(1))[0];
 
@@ -36,29 +49,38 @@ export default function AnalyzingScreen() {
   }, []);
 
   useEffect(() => {
-    const timers = STEPS.map((_, i) =>
-      setTimeout(() => setCurrentStep(i), i * 1200)
-    );
-    const done = setTimeout(() => {
-      // Mock result setting
-      setResult({
-        condition_name: "Anthracnose Leaf Blight",
-        confidence: 87,
-        severity: "moderate",
-        explanation: "Anthracnose is a group of fungal diseases causing dark, sunken lesions on leaves, stems, and fruit. Common in the Northeast during cool, wet spring conditions. Your location in the NY/NJ/CT area and recent rainfall patterns are consistent with this diagnosis.",
-        actions: [
-          { priority: "Now", text: "Remove and dispose of affected leaves to reduce spread", color: "#D4534B" },
-          { priority: "Soon", text: "Improve air circulation through targeted pruning", color: COLORS.alertAmber },
-          { priority: "Seasonal", text: "Apply preventive fungicide treatment in early spring", color: COLORS.almsteadGreen },
-        ]
-      });
-      router.replace('/(main)/results');
-    }, STEPS.length * 1200 + 800);
+    const stepInterval = setInterval(() => {
+      setCurrentStep(prev => (prev < STEPS.length - 1 ? prev + 1 : prev));
+    }, 1500);
 
-    return () => {
-      timers.forEach(clearTimeout);
-      clearTimeout(done);
+    const startAnalysis = async () => {
+      if (!user || !capturedImage) return;
+
+      const response = await performAnalysis(user.id, capturedImage, {
+        symptoms: selectedTags,
+        description: description,
+        location: location
+      });
+
+      if (response.success && response.result) {
+        setResult(response.result);
+        if (response.imageUrl) {
+          setRemoteImageUrl(response.imageUrl);
+        }
+        deductCredit(); // Update local store
+        router.replace('/(main)/results');
+      } else {
+        Alert.alert(
+          'Analysis Failed',
+          response.error || 'Something went wrong while analyzing your plant.',
+          [{ text: 'Try Again', onPress: () => router.back() }]
+        );
+      }
     };
+
+    startAnalysis();
+
+    return () => clearInterval(stepInterval);
   }, []);
 
   return (

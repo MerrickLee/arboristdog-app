@@ -5,6 +5,8 @@ import { COLORS } from '../../constants/theme';
 import { TreeRingPaw, BackArrow } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
+import { supabase } from '../../services/supabase';
+import { Alert } from 'react-native';
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -14,18 +16,36 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
-  const handleAuth = (method: string) => {
-    // Mocking auth response
-    setUser({
-      id: 'mock-user-id',
-      name: name || 'Mock User',
-      email: email || 'mock@example.com',
-      phone: phone || '',
-      auth_method: method,
-      is_almstead_customer: false,
-      has_onboarded: false,
-    });
-    router.replace('/(main)/onboard');
+  const handleAuth = async (method: string) => {
+    if (method === 'email') {
+      if (!email || !name) {
+        Alert.alert('Error', 'Please fill in all fields');
+        return;
+      }
+
+      setLoading(true);
+      // For this app, we assume sign-up creates a profile automatically via SQL trigger
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: 'password123', // In a real app, you'd have a password field
+        options: {
+          data: {
+            full_name: name,
+          }
+        }
+      });
+
+      if (error) {
+        Alert.alert('Auth Error', error.message);
+        setLoading(false);
+      } else {
+        // Session listener in RootLayout will handle redirect
+      }
+    }
+  };
+
+  const handleSocialAuth = (provider: string) => {
+    Alert.alert('Social Login', `Connecting to ${provider}... (Native SDK configuration required)`);
   };
 
   if (mode === 'manual') {
@@ -98,11 +118,11 @@ export default function SignInScreen() {
           Create an account to save your diagnoses and get personalized care recommendations.
         </Text>
 
-        <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#fff' }]} onPress={() => setMode('phone_step')}>
+        <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#fff' }]} onPress={() => handleSocialAuth('Apple')}>
           <Text style={[styles.socialText, { color: '#000' }]}>Continue with Apple</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={[styles.socialButton, { backgroundColor: 'rgba(255,255,255,0.06)' }]} onPress={() => setMode('phone_step')}>
+        <TouchableOpacity style={[styles.socialButton, { backgroundColor: 'rgba(255,255,255,0.06)' }]} onPress={() => handleSocialAuth('Google')}>
           <Text style={[styles.socialText, { color: '#fff' }]}>Continue with Google</Text>
         </TouchableOpacity>
 

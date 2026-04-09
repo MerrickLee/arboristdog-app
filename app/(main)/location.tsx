@@ -11,8 +11,12 @@ import { useDiagnosisStore } from '../../stores/diagnosisStore';
 export default function LocationScreen() {
   const router = useRouter();
   const { setLocation } = useDiagnosisStore();
-  const [address, setAddress] = useState("");
-  const [propertyType, setPropertyType] = useState<'residential' | 'commercial'>('residential');
+  const [structuredAddress, setStructuredAddress] = useState<{
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  }>({});
 
   const handleGPSLocation = async () => {
     try {
@@ -20,15 +24,46 @@ export default function LocationScreen() {
       if (status !== 'granted') return;
 
       const location = await ExpoLocation.getCurrentPositionAsync({});
-      // In a real app, we'd reverse-geocode this location.lat/lng via Google Geocoding API.
-      setAddress(`Lat: ${location.coords.latitude.toFixed(4)}, Lng: ${location.coords.longitude.toFixed(4)}`);
+      const { latitude, longitude } = location.coords;
+
+      // Reverse geocode to get split fields
+      const [addressResult] = await ExpoLocation.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      if (addressResult) {
+        const street = addressResult.street || addressResult.name || "";
+        const city = addressResult.city || "";
+        const state = addressResult.region || "";
+        const zip = addressResult.postalCode || "";
+
+        setStructuredAddress({ street, city, state, zip });
+        setAddress(`${street}, ${city}, ${state} ${zip}`.trim().replace(/^,/, ''));
+        
+        setLocation({ 
+          address: `${street}, ${city}, ${state} ${zip}`.trim().replace(/^,/, ''),
+          street,
+          city,
+          state,
+          zip,
+          propertyType,
+          coordinates: { lat: latitude, lng: longitude }
+        });
+      } else {
+        setAddress(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+      }
     } catch (e) {
       console.log(e);
     }
   };
 
   const handleNext = () => {
-    setLocation({ address, propertyType });
+    setLocation({ 
+      address, 
+      ...structuredAddress,
+      propertyType 
+    });
     router.push('/(main)/analyzing');
   };
 

@@ -43,22 +43,45 @@ Property owners frequently notice troubling signs in their trees, shrubs, or law
 
 ---
 
-## 🚀 Getting Started Locally
+## 🚀 Getting Started
 
-To run the ArboristDog frontend and test the UI mockups natively:
+ArboristDog uses native modules (Google Maps, RevenueCat) and requires a **Development Build** to run on a physical device.
 
 **1. Install Dependencies**
 ```bash
 npm install
 ```
 
-**2. Start the Expo Server**
+**2. Configure Environment**
+Create a `.env` file in the root and add your `EXPO_PUBLIC_` keys (see `eas_secrets_list.md` for the full list).
+
+**3. Generate Native Projects**
 ```bash
-npx expo start
+npx expo prebuild
 ```
 
-**3. Test on a Device**
-Scan the QR code generated in your terminal using the **Expo Go** app on your iOS or Android device.
+**4. Run on Device**
+- **iOS:** Open `ios/arboristdogapp.xcworkspace` in Xcode, set your Signing Team, and hit **Play**.
+- **Android:** Run `npx expo run:android`.
+
+---
+
+## ⚙️ Technical Architecture
+
+ArboristDog is built for production scale with a secure, serverless backend.
+
+### 🗄️ Backend (Supabase)
+- **Database:** PostgreSQL schema for user profiles, diagnosis history, and scan credits. See [**`supabase_schema.sql`**](file:///Users/merricklee/Documents/Projects/Arborist%20Dog%20-%20App/Untitled/arboristdog-app/supabase_schema.sql).
+- **Storage:** Secure bucket for high-res diagnosis photos. See [**`supabase_storage.sql`**](file:///Users/merricklee/Documents/Projects/Arborist%20Dog%20-%20App/Untitled/arboristdog-app/supabase_storage.sql).
+- **Edge Functions:** Secure Deno function (`analyze-plant`) handles Claude 3.5 Sonnet Vision calls.
+
+### 💰 Monetization (RevenueCat)
+- Handles all In-App Purchases and Entitlements.
+- Syncs purchase events directly to the Supabase credit system.
+
+### ⚡ Automation (Zapier)
+- Routes high-intent leads to Almstead sales teams.
+- Sends detailed structured payloads: User info, Symptoms, AI Analysis, and Supabase Image URLs.
 
 ---
 

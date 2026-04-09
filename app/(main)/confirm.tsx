@@ -6,20 +6,48 @@ import { BackArrow, CheckIcon, TreeIcon } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { sendLead } from '../../services/zapier';
 
 export default function ConfirmScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { resetSession } = useDiagnosisStore();
-  const [submitted, setSubmitted] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [preferredTime, setPreferredTime] = useState('morning');
+  const {
+    location,
+    result,
+    selectedTags,
+    description,
+    capturedImage,
+    remoteImageUrl,
+    resetSession
+  } = useDiagnosisStore();
 
-  const TIMES = ['Morning', 'Afternoon', 'Evening'];
+  const handleSubmit = async () => {
+    if (!user || !location || !result) return;
 
-  const handleSubmit = () => {
-    // In real app: submit lead to Supabase
-    setSubmitted(true);
+    // Submit lead to Zapier
+    const response = await sendLead({
+      user: {
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+      },
+      location: location,
+      diagnosis: result,
+      context: {
+        tags: selectedTags,
+        description: description,
+        image_uri: remoteImageUrl || capturedImage,
+      },
+      notes,
+      preferredTime,
+    });
+
+    if (response.success) {
+      setSubmitted(true);
+    } else {
+      console.error("Failed to submit lead:", response.error);
+      // Optional: Show alert to user
+    }
   };
 
   const handleRestart = () => {
