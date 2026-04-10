@@ -1,22 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
-import { BackArrow } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { ProgressDots } from '../../components/ui/ProgressDots';
 import { useAuthStore } from '../../stores/authStore';
+import { supabase } from '../../services/supabase';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
 export default function OnboardScreen() {
   const router = useRouter();
-  const { setHasOnboarded } = useAuthStore();
+  const { user, setHasOnboarded } = useAuthStore();
 
   useTrackScreen('Onboarding');
 
-  const handleNext = () => {
+  const handleNext = async () => {
     trackEvent('onboarding_completed');
+    // Persist to Supabase so it survives app restarts
+    if (user?.id) {
+      await supabase
+        .from('profiles')
+        .update({ has_onboarded: true })
+        .eq('id', user.id);
+    }
     setHasOnboarded(true);
     router.replace('/(main)/capture');
   };
@@ -30,11 +37,7 @@ export default function OnboardScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <BackArrow />
-        </TouchableOpacity>
-      </View>
+      <View style={styles.header} />
       <View style={styles.content}>
         <Text style={styles.title}>How it works</Text>
         

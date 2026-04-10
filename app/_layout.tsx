@@ -8,7 +8,7 @@ import { supabase } from '../services/supabase';
 
 export default function RootLayout() {
   const { user, isLoading, setUser, setLoading } = useAuthStore();
-  const { setCredits } = useCreditStore();
+  const { setCreditsRemaining } = useCreditStore();
   const segments = useSegments();
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
@@ -76,7 +76,7 @@ export default function RootLayout() {
       .single();
 
     if (data && !error) {
-      setCredits(data.balance);
+      setCreditsRemaining(data.balance);
     }
   };
 
