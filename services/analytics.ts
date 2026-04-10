@@ -1,5 +1,4 @@
 import { CSQ } from "@contentsquare/react-native-bridge";
-import { useEffect } from "react";
 
 const HEAP_ENVIRONMENT_ID = process.env.EXPO_PUBLIC_HEAP_ENVIRONMENT_ID || "";
 
