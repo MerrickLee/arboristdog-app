@@ -6,6 +6,8 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { CameraIcon, TreeIcon, BackArrow } from '../../components/ui/Icons';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function CaptureScreen() {
   const router = useRouter();
@@ -14,6 +16,8 @@ export default function CaptureScreen() {
   const { setCapturedImage } = useDiagnosisStore();
   const [isReady, setIsReady] = useState(false);
 
+  useTrackScreen('Capture');
+
   useEffect(() => {
     if (!permission?.granted) {
       requestPermission();
@@ -21,6 +25,7 @@ export default function CaptureScreen() {
   }, [permission]);
 
   const handleCapture = async () => {
+    trackEvent('photo_captured', { method: 'camera' });
     if (cameraRef.current) {
       try {
         const photo = await cameraRef.current.takePictureAsync({
@@ -38,6 +43,7 @@ export default function CaptureScreen() {
   };
 
   const handleGallery = async () => {
+    trackEvent('photo_captured', { method: 'gallery' });
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,

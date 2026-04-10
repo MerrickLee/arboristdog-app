@@ -7,10 +7,14 @@ import { BackArrow, LocationIcon } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { ProgressDots } from '../../components/ui/ProgressDots';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function LocationScreen() {
   const router = useRouter();
   const { setLocation } = useDiagnosisStore();
+
+  useTrackScreen('Location');
   const [structuredAddress, setStructuredAddress] = useState<{
     street?: string;
     city?: string;
@@ -19,6 +23,7 @@ export default function LocationScreen() {
   }>({});
 
   const handleGPSLocation = async () => {
+    trackEvent('location_method_used', { method: 'gps' });
     try {
       const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
@@ -64,6 +69,7 @@ export default function LocationScreen() {
       ...structuredAddress,
       propertyType 
     });
+    trackEvent('location_submitted', { method: address ? 'manual' : 'gps', property_type: propertyType });
     router.push('/(main)/analyzing');
   };
 

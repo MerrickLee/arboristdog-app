@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { TreeRingPaw, CheckIcon } from '../../components/ui/Icons';
@@ -7,7 +7,8 @@ import { useDiagnosisStore } from '../../stores/diagnosisStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useCreditStore } from '../../stores/creditStore';
 import { performAnalysis } from '../../services/analysis';
-import { Alert } from 'react-native';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 const STEPS = [
   "Analyzing image...",
@@ -30,6 +31,9 @@ export default function AnalyzingScreen() {
   } = useDiagnosisStore();
   const [currentStep, setCurrentStep] = useState(0);
   const pulseAnim = useState(new Animated.Value(1))[0];
+
+  useTrackScreen('Analyzing');
+  trackEvent('analysis_started', { tag_count: selectedTags?.length ?? 0 });
 
   useEffect(() => {
     Animated.loop(
@@ -67,9 +71,15 @@ export default function AnalyzingScreen() {
         if (response.imageUrl) {
           setRemoteImageUrl(response.imageUrl);
         }
-        deductCredit(); // Update local store
+        deductCredit();
+        trackEvent('analysis_completed', {
+          condition: response.result.condition_name,
+          severity: response.result.severity,
+          confidence: response.result.confidence,
+        });
         router.replace('/(main)/results');
       } else {
+        trackEvent('analysis_failed', { error: response.error ?? 'unknown' });
         Alert.alert(
           'Analysis Failed',
           response.error || 'Something went wrong while analyzing your plant.',

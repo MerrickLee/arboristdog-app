@@ -6,6 +6,8 @@ import { BackArrow, CheckIcon, TreeIcon } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { ProgressDots } from '../../components/ui/ProgressDots';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 const ISSUES = [
   "Discoloration", "Wilting", "Spots/Lesions", "Dead branches", 
@@ -19,16 +21,19 @@ export default function ContextScreen() {
   const [selected, setSelected] = useState<string[]>([]);
   const [text, setText] = useState("");
 
+  useTrackScreen('Context');
+
   const toggle = (item: string) => {
-    if (selected.includes(item)) {
-      setSelected(selected.filter(x => x !== item));
-    } else {
-      setSelected([...selected, item]);
-    }
+    const nowSelected = selected.includes(item)
+      ? selected.filter(x => x !== item)
+      : [...selected, item];
+    setSelected(nowSelected);
+    trackEvent('issue_tag_toggled', { tag: item, selected: !selected.includes(item) });
   };
 
   const handleNext = () => {
     setContext(selected, text);
+    trackEvent('context_submitted', { tag_count: selected.length, has_description: text.length > 0 });
     router.push('/(main)/location');
   };
 

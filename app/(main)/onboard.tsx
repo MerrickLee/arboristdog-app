@@ -6,12 +6,17 @@ import { BackArrow } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { ProgressDots } from '../../components/ui/ProgressDots';
 import { useAuthStore } from '../../stores/authStore';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function OnboardScreen() {
   const router = useRouter();
   const { setHasOnboarded } = useAuthStore();
 
+  useTrackScreen('Onboarding');
+
   const handleNext = () => {
+    trackEvent('onboarding_completed');
     setHasOnboarded(true);
     router.replace('/(main)/capture');
   };

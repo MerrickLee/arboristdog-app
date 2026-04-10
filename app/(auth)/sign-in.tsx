@@ -18,6 +18,8 @@ import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../services/supabase';
 import { signInWithApple, signInWithGoogle } from '../../services/auth';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 // ─── Apple icon (simple  logo) ───────────────────────────────────────────────
 const AppleIcon = () => (
@@ -44,13 +46,15 @@ export default function SignInScreen() {
   const [appleLoading, setAppleLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  useTrackScreen('SignIn');
+
   // ── Email / manual sign-up ──────────────────────────────────────────────────
   const handleEmailAuth = async () => {
     if (!email || !name) {
       Alert.alert('Missing info', 'Please fill in your name and email.');
       return;
     }
-
+    trackEvent('sign_in_attempted', { method: 'email' });
     setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -69,6 +73,7 @@ export default function SignInScreen() {
 
   // ── Apple Sign-In ───────────────────────────────────────────────────────────
   const handleAppleSignIn = async () => {
+    trackEvent('sign_in_attempted', { method: 'apple' });
     setAppleLoading(true);
     try {
       await signInWithApple();
@@ -85,6 +90,7 @@ export default function SignInScreen() {
 
   // ── Google Sign-In ──────────────────────────────────────────────────────────
   const handleGoogleSignIn = async () => {
+    trackEvent('sign_in_attempted', { method: 'google' });
     setGoogleLoading(true);
     try {
       await signInWithGoogle();

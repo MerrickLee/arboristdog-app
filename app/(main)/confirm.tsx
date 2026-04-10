@@ -7,6 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
 import { sendLead } from '../../services/zapier';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function ConfirmScreen() {
   const router = useRouter();
@@ -23,6 +25,10 @@ export default function ConfirmScreen() {
 
   const handleSubmit = async () => {
     if (!user || !location || !result) return;
+    trackEvent('consultation_requested', {
+      condition: result.condition_name,
+      preferred_time: preferredTime,
+    });
 
     // Submit lead to Zapier
     const response = await sendLead({
@@ -51,9 +57,12 @@ export default function ConfirmScreen() {
   };
 
   const handleRestart = () => {
+    trackEvent('diagnose_another_tapped');
     resetSession();
     router.replace('/(main)/capture');
   };
+
+  useTrackScreen('Confirm');
 
   if (submitted) {
     return (

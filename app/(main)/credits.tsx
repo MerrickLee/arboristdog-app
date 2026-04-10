@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { BackArrow, TreeRingPaw } from '../../components/ui/Icons';
@@ -8,7 +8,8 @@ import { useCreditStore } from '../../stores/creditStore';
 import { useAuthStore } from '../../stores/authStore';
 import { getAvailableOfferings, purchasePackage, restorePurchases } from '../../services/purchases';
 import { syncPurchasedCredits } from '../../services/credits';
-import { Alert, ActivityIndicator } from 'react-native';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function CreditsScreen() {
   const router = useRouter();
@@ -18,6 +19,8 @@ export default function CreditsScreen() {
   const [offering, setOffering] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  useTrackScreen('Credits');
 
   React.useEffect(() => {
     fetchOfferings();
@@ -31,23 +34,22 @@ export default function CreditsScreen() {
 
   const handlePurchase = async (pack: any) => {
     if (!user) return;
-    
+    trackEvent('purchase_initiated', { package_id: pack.identifier, price: pack.product.priceString });
     setProcessing(true);
     const response = await purchasePackage(pack);
     
     if (response.success) {
-      // Determine credit amount from metadata or package identifier
-      // For this app, we'll look for 'credit_count' in metadata or fallback to 3
       const amount = pack.packageType === 'MONTHLY' ? 10 : (pack.product.metadata?.credit_count || 3);
-      
       const sync = await syncPurchasedCredits(user.id, amount);
       if (sync.success) {
         addCredits(amount);
         setPurchased(true);
+        trackEvent('purchase_completed', { package_id: pack.identifier, credits_added: amount });
       } else {
         Alert.alert("Success, but...", "Payment was successful, but we had trouble syncing your credits. Please try 'Restore Purchases'.");
       }
     } else if (!response.cancelled) {
+      trackEvent('purchase_failed', { package_id: pack.identifier, error: response.error });
       Alert.alert("Purchase failed", response.error || "Something went wrong.");
     }
     setProcessing(false);

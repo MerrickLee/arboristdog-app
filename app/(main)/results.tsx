@@ -7,6 +7,8 @@ import { Button } from '../../components/ui/Button';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useCreditStore } from '../../stores/creditStore';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function ResultsScreen() {
   const router = useRouter();
@@ -14,7 +16,9 @@ export default function ResultsScreen() {
   const { user } = useAuthStore();
   const { creditsRemaining } = useCreditStore();
 
-  if (!result) return null; // Or Loading indicator
+  useTrackScreen('Results');
+
+  if (!result) return null;
 
   return (
     <View style={styles.container}>
@@ -41,7 +45,13 @@ export default function ResultsScreen() {
           </View>
           <Text style={styles.creditsText}>{creditsRemaining} scans remaining this month</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/(main)/credits')} style={styles.getMoreBtn}>
+        <TouchableOpacity
+          onPress={() => {
+            trackEvent('get_more_credits_tapped');
+            router.push('/(main)/credits');
+          }}
+          style={styles.getMoreBtn}
+        >
           <Text style={styles.getMoreText}>Get more</Text>
         </TouchableOpacity>
       </View>
@@ -82,7 +92,17 @@ export default function ResultsScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button onPress={() => router.push('/(main)/confirm')} variant="dark">
+        <Button
+          onPress={() => {
+            trackEvent('get_expert_help_tapped', {
+              condition: result.condition_name,
+              severity: result.severity,
+              confidence: result.confidence,
+            });
+            router.push('/(main)/confirm');
+          }}
+          variant="dark"
+        >
           Get Expert Help Free
         </Button>
         <Text style={styles.footerNote}>A certified arborist will review your case</Text>

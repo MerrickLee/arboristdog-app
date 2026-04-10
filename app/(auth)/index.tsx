@@ -5,9 +5,13 @@ import { COLORS } from '../../constants/theme';
 import { TreeRingPaw } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTrackScreen } from '../../hooks/useTrackScreen';
+import { trackEvent } from '../../services/analytics';
 
 export default function SplashScreen() {
   const router = useRouter();
+
+  useTrackScreen('Splash');
 
   return (
     <View style={styles.container}>
@@ -21,7 +25,10 @@ export default function SplashScreen() {
         <Text style={styles.description}>Tree, Shrub & Lawn Care</Text>
         
         <Button 
-          onPress={() => router.push('/(auth)/sign-in')}
+          onPress={() => {
+            trackEvent('diagnose_cta_tapped');
+            router.push('/(auth)/sign-in');
+          }}
           style={{ width: 260, marginTop: 40 }}
         >
           Diagnose My Landscape

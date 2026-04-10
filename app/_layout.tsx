@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '../stores/authStore';
 import { useCreditStore } from '../stores/creditStore';
-import { initAnalytics } from '../services/analytics';
+import { initAnalytics, trackEvent, identifyUser } from '../services/analytics';
 import { initPurchases } from '../services/purchases';
 import { supabase } from '../services/supabase';
 
@@ -18,7 +18,10 @@ export default function RootLayout() {
     // Initialize external services
     initAnalytics();
     initPurchases();
-    
+
+    // Track that the app was opened
+    trackEvent('app_start');
+
     // Check for active session
     checkUser();
 
@@ -55,6 +58,8 @@ export default function RootLayout() {
 
     if (data && !error) {
       setUser(data);
+      // Identify the user in Heap so all events are attributed to them
+      identifyUser(userId);
       // Also fetch credits
       fetchCredits(userId);
     } else {
