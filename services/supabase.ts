@@ -11,6 +11,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    flowType: 'pkce',
+    flowType: 'implicit', // PKCE loses verifier in Expo Go between browser open/close
   },
 });

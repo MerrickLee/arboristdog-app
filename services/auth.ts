@@ -55,34 +55,53 @@ export const signInWithApple = async (): Promise<void> => {
  * On success, supabase.auth.onAuthStateChange fires automatically.
  */
 export const signInWithGoogle = async (): Promise<void> => {
-  // Build the redirect URI that Supabase will redirect back to after OAuth.
-  // In Expo Go this resolves to the local Metro dev URL; in a build it uses the app scheme.
   const redirectTo = makeRedirectUri();
 
   const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo,
-      skipBrowserRedirect: true, // We open the browser manually below
+      skipBrowserRedirect: true,
     },
   });
 
   if (oauthError) throw oauthError;
   if (!data.url) throw new Error('Google Sign-In failed: no OAuth URL returned.');
 
-  // Open the Google OAuth page in a browser. Expo handles closing it
-  // automatically when the redirect URI is detected.
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
   if (result.type === 'success') {
-    // Exchange the auth code / hash fragment for a Supabase session.
-    const { error: sessionError } = await supabase.auth.exchangeCodeForSession(
-      result.url
-    );
-    if (sessionError) throw sessionError;
-    // onAuthStateChange in _layout.tsx will detect the new session and navigate.
+    // With implicit flow, Supabase returns tokens in the URL hash fragment:
+    // exp://127.0.0.1:8081#access_token=...&refresh_token=...
+    const url = result.url;
+    const hashIndex = url.indexOf('#');
+    const queryIndex = url.indexOf('?');
+
+    // Support both hash-fragment (implicit) and query-param (pkce fallback) responses
+    const paramString =
+      hashIndex !== -1
+        ? url.slice(hashIndex + 1)
+        : queryIndex !== -1
+        ? url.slice(queryIndex + 1)
+        : '';
+
+    const params = new URLSearchParams(paramString);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (accessToken && refreshToken) {
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (sessionError) throw sessionError;
+      // onAuthStateChange in _layout.tsx detects the new session and navigates.
+    } else {
+      // Fallback: try PKCE-style code exchange (production builds)
+      const { error: sessionError } = await supabase.auth.exchangeCodeForSession(url);
+      if (sessionError) throw sessionError;
+    }
   } else if (result.type === 'cancel' || result.type === 'dismiss') {
-    // User cancelled — not an error, just do nothing.
     return;
   }
 };
