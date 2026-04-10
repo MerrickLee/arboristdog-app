@@ -1,56 +1,108 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { TreeRingPaw, BackArrow } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../services/supabase';
-import { Alert } from 'react-native';
+import { signInWithApple, signInWithGoogle } from '../../services/auth';
+
+// ─── Apple icon (simple  logo) ───────────────────────────────────────────────
+const AppleIcon = () => (
+  <Text style={{ fontSize: 18, color: '#000', marginRight: 8, lineHeight: 22 }}>
+    
+  </Text>
+);
+
+// ─── Google icon (using Unicode G) ───────────────────────────────────────────
+const GoogleIcon = () => (
+  <Text style={{ fontSize: 16, color: '#4285F4', fontWeight: '700', marginRight: 8 }}>
+    G
+  </Text>
+);
 
 export default function SignInScreen() {
   const router = useRouter();
   const { setUser } = useAuthStore();
-  const [mode, setMode] = useState<null | 'manual' | 'phone_step'>(null);
+  const [mode, setMode] = useState<null | 'manual'>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleAuth = async (method: string) => {
-    if (method === 'email') {
-      if (!email || !name) {
-        Alert.alert('Error', 'Please fill in all fields');
-        return;
+  // ── Email / manual sign-up ──────────────────────────────────────────────────
+  const handleEmailAuth = async () => {
+    if (!email || !name) {
+      Alert.alert('Missing info', 'Please fill in your name and email.');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password: 'password123',
+      options: {
+        data: { full_name: name },
+      },
+    });
+    setLoading(false);
+
+    if (error) {
+      Alert.alert('Sign-up error', error.message);
+    }
+    // On success, onAuthStateChange in _layout.tsx handles navigation.
+  };
+
+  // ── Apple Sign-In ───────────────────────────────────────────────────────────
+  const handleAppleSignIn = async () => {
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+      // Navigation handled by onAuthStateChange
+    } catch (err: any) {
+      // ERR_CANCELED means the user dismissed the sheet — not an error worth alerting
+      if (err?.code !== 'ERR_CANCELED') {
+        Alert.alert('Apple Sign-In failed', err?.message ?? 'Unknown error');
       }
-
-      setLoading(true);
-      // For this app, we assume sign-up creates a profile automatically via SQL trigger
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: 'password123', // In a real app, you'd have a password field
-        options: {
-          data: {
-            full_name: name,
-          }
-        }
-      });
-
-      if (error) {
-        Alert.alert('Auth Error', error.message);
-        setLoading(false);
-      } else {
-        // Session listener in RootLayout will handle redirect
-      }
+    } finally {
+      setAppleLoading(false);
     }
   };
 
-  const handleSocialAuth = (provider: string) => {
-    Alert.alert('Social Login', `Connecting to ${provider}... (Native SDK configuration required)`);
+  // ── Google Sign-In ──────────────────────────────────────────────────────────
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      // Navigation handled by onAuthStateChange
+    } catch (err: any) {
+      Alert.alert('Google Sign-In failed', err?.message ?? 'Unknown error');
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
+  // ── Manual sign-up view ─────────────────────────────────────────────────────
   if (mode === 'manual') {
     return (
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => setMode(null)}>
             <BackArrow />
@@ -58,8 +110,10 @@ export default function SignInScreen() {
         </View>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.subtitle}>Quick sign up so we can save your diagnoses.</Text>
-          
+          <Text style={styles.subtitle}>
+            Quick sign up so we can save your diagnoses.
+          </Text>
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>FULL NAME</Text>
             <TextInput
@@ -93,15 +147,20 @@ export default function SignInScreen() {
               onChangeText={setPhone}
             />
           </View>
-          <Text style={styles.termsText}>By continuing, you agree to our Terms of Service and Privacy Policy.</Text>
+          <Text style={styles.termsText}>
+            By continuing, you agree to our Terms of Service and Privacy Policy.
+          </Text>
         </ScrollView>
         <View style={styles.footer}>
-          <Button onPress={() => handleAuth('email')}>Create Account</Button>
+          <Button onPress={handleEmailAuth}>
+            {loading ? 'Creating account...' : 'Create Account'}
+          </Button>
         </View>
       </KeyboardAvoidingView>
     );
   }
 
+  // ── Main sign-in view ───────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -109,21 +168,60 @@ export default function SignInScreen() {
           <BackArrow />
         </TouchableOpacity>
       </View>
+
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <TreeRingPaw size={60} />
         </View>
         <Text style={styles.titleCenter}>Sign in</Text>
         <Text style={styles.subtitleCenter}>
-          Create an account to save your diagnoses and get personalized care recommendations.
+          Create an account to save your diagnoses and get personalized care
+          recommendations.
         </Text>
 
-        <TouchableOpacity style={[styles.socialButton, { backgroundColor: '#fff' }]} onPress={() => handleSocialAuth('Apple')}>
-          <Text style={[styles.socialText, { color: '#000' }]}>Continue with Apple</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.socialButton, { backgroundColor: 'rgba(255,255,255,0.06)' }]} onPress={() => handleSocialAuth('Google')}>
-          <Text style={[styles.socialText, { color: '#fff' }]}>Continue with Google</Text>
+        {/* Apple — iOS only, per Apple guidelines */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            id="btn-sign-in-apple"
+            style={[styles.socialButton, { backgroundColor: '#fff' }]}
+            onPress={handleAppleSignIn}
+            disabled={appleLoading}
+            activeOpacity={0.85}
+          >
+            {appleLoading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <View style={styles.socialRow}>
+                <AppleIcon />
+                <Text style={[styles.socialText, { color: '#000' }]}>
+                  Continue with Apple
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Google */}
+        <TouchableOpacity
+          id="btn-sign-in-google"
+          style={[
+            styles.socialButton,
+            { backgroundColor: 'rgba(255,255,255,0.06)' },
+          ]}
+          onPress={handleGoogleSignIn}
+          disabled={googleLoading}
+          activeOpacity={0.85}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <View style={styles.socialRow}>
+              <GoogleIcon />
+              <Text style={[styles.socialText, { color: '#fff' }]}>
+                Continue with Google
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <View style={styles.divider}>
@@ -132,10 +230,18 @@ export default function SignInScreen() {
           <View style={styles.line} />
         </View>
 
-        <TouchableOpacity style={[styles.socialButton, { backgroundColor: 'transparent' }]} onPress={() => setMode('manual')}>
-          <Text style={[styles.socialText, { color: '#fff' }]}>Sign up with email</Text>
+        <TouchableOpacity
+          id="btn-sign-in-email"
+          style={[styles.socialButton, { backgroundColor: 'transparent' }]}
+          onPress={() => setMode('manual')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.socialText, { color: '#fff' }]}>
+            Sign up with email
+          </Text>
         </TouchableOpacity>
       </View>
+
       <View style={styles.footer}>
         <Text style={styles.termsTextCenter}>
           By continuing, you agree to our Terms of Service and Privacy Policy.
@@ -219,6 +325,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
+    minHeight: 50,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   socialText: {
     fontSize: 15,

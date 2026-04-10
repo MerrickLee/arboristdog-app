@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.almstead.arboristdog"
+      "bundleIdentifier": "com.almstead.arboristdog",
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.almstead.arboristdog",
@@ -41,7 +42,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,
