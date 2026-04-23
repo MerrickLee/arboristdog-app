@@ -40,10 +40,20 @@ export default function RootLayout() {
   }, []);
 
   const checkUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      fetchProfile(session.user.id);
-    } else {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Session check error:", error.message);
+        setUser(null);
+        return;
+      }
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setUser(null);
+      }
+    } catch (error) {
+      console.error("Network or unexpected error during session check:", error);
       setUser(null);
     }
   };
