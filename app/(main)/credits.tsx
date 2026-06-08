@@ -19,6 +19,8 @@ export default function CreditsScreen() {
   const [offering, setOffering] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [zipInput, setZipInput] = useState('');
+  const [verifyingZip, setVerifyingZip] = useState(false);
 
   useTrackScreen('Credits');
 
@@ -63,6 +65,38 @@ export default function CreditsScreen() {
       // In a real app, you'd re-fetch the latest balance from Supabase here
     }
     setProcessing(false);
+  };
+
+  const verifyZipCode = async () => {
+    if (zipInput.length < 5) {
+      Alert.alert('Invalid Zip', 'Please enter a 5-digit zip code.');
+      return;
+    }
+    setVerifyingZip(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-zipcode', {
+        body: { zipcode: zipInput }
+      });
+      if (error) throw error;
+      
+      if (data?.inTargetArea) {
+        Alert.alert('Success!', 'You are in our service area! We have upgraded you to 5 free scans per month.');
+        // Re-fetch profile to update local state (in_target_area)
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user!.id).single();
+        if (profile) useAuthStore.getState().setUser(profile);
+        // Also fetch latest credits
+        const { data: creditsData } = await supabase.from('user_credits').select('balance').eq('user_id', user!.id).single();
+        if (creditsData) {
+          useCreditStore.getState().addCredits(creditsData.balance - useCreditStore.getState().creditsRemaining);
+        }
+      } else {
+        Alert.alert('Not in service area', 'Sorry, that zip code is not currently in our priority service area. You still receive 1 free scan per month!');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to verify zip code.');
+    }
+    setVerifyingZip(false);
   };
 
   if (purchased) {
@@ -128,18 +162,48 @@ export default function CreditsScreen() {
           <Text style={styles.restoreText}>Restore Purchases</Text>
         </TouchableOpacity>
 
-        <View style={styles.almsteadCta}>
-          <View style={styles.ctaIcon}>
-            <TreeRingPaw size={24} />
+        {!user?.is_almstead_customer && !user?.in_target_area && (
+          <View style={styles.zipCodeContainer}>
+            <Text style={styles.zipCodeTitle}>Get 5 Free Scans / Month</Text>
+            <Text style={styles.zipCodeSub}>Check if you're in our service area to unlock more free monthly scans.</Text>
+            <View style={styles.zipCodeInputRow}>
+              <TextInput 
+                style={styles.zipCodeInput}
+                placeholder="Enter Zip Code"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={zipInput}
+                onChangeText={setZipInput}
+                keyboardType="number-pad"
+                maxLength={5}
+              />
+              <TouchableOpacity style={styles.zipCodeBtn} onPress={verifyZipCode} disabled={verifyingZip}>
+                {verifyingZip ? <ActivityIndicator color="#fff" /> : <Text style={styles.zipCodeBtnText}>Check</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
-          <Text style={styles.ctaTitle}>Already an Almstead customer?</Text>
-          <Text style={styles.ctaSub}>
-            Verify your account and get unlimited scans for free. We'll check your email or property address against our records.
-          </Text>
-          <TouchableOpacity style={styles.verifyBtn}>
-            <Text style={styles.verifyText}>Verify my account</Text>
-          </TouchableOpacity>
-        </View>
+        )}
+
+        {user?.is_almstead_customer ? (
+          <View style={[styles.almsteadCta, { backgroundColor: 'rgba(123,201,80,0.15)', borderColor: COLORS.leafAccent }]}>
+            <View style={[styles.ctaIcon, { backgroundColor: COLORS.leafAccent }]}>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>✓</Text>
+            </View>
+            <Text style={[styles.ctaTitle, { color: COLORS.leafAccent, fontSize: 16 }]}>Almstead Premium Active</Text>
+            <Text style={styles.ctaSub}>
+              Your account is linked to your Almstead profile. You have full access and unlimited free scans!
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.almsteadCta}>
+            <View style={styles.ctaIcon}>
+              <TreeRingPaw size={24} />
+            </View>
+            <Text style={styles.ctaTitle}>Already an Almstead customer?</Text>
+            <Text style={styles.ctaSub}>
+              Sign up with the email associated with your Almstead account and automatically get unlimited scans for free!
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -339,5 +403,55 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     fontSize: 13,
     textDecorationLine: 'underline',
+  },
+  zipCodeContainer: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  zipCodeTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  zipCodeSub: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  zipCodeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  zipCodeInput: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 10,
+    color: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  zipCodeBtn: {
+    backgroundColor: COLORS.leafAccent,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  zipCodeBtnText: {
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

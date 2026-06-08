@@ -119,6 +119,9 @@ export default function SignInScreen() {
           <Text style={styles.subtitle}>
             Quick sign up so we can save your diagnoses.
           </Text>
+          <View style={styles.almsteadCallout}>
+            <Text style={styles.almsteadCalloutText}>✨ Almstead customers get full access for free</Text>
+          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>FULL NAME</Text>
@@ -184,6 +187,10 @@ export default function SignInScreen() {
           Create an account to save your diagnoses and get personalized care
           recommendations.
         </Text>
+        
+        <View style={[styles.almsteadCallout, { alignSelf: 'center', marginBottom: 32 }]}>
+          <Text style={styles.almsteadCalloutText}>✨ Almstead customers get full access for free</Text>
+        </View>
 
         {/* Apple — iOS only, per Apple guidelines */}
         {Platform.OS === 'ios' && (
@@ -390,6 +397,21 @@ const styles = StyleSheet.create({
   termsTextCenter: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.35)',
+    textAlign: 'center',
+  },
+  almsteadCallout: {
+    backgroundColor: 'rgba(123,201,80,0.15)',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(123,201,80,0.3)',
+    marginBottom: 24,
+  },
+  almsteadCalloutText: {
+    color: '#7bc950',
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

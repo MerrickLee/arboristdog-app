@@ -1,5 +1,5 @@
 -- 1. Create Profiles Table (linked to Supabase Auth)
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
   full_name TEXT,
   email TEXT UNIQUE,
@@ -11,7 +11,7 @@ CREATE TABLE profiles (
 );
 
 -- 2. Create Diagnoses Table
-CREATE TABLE diagnoses (
+CREATE TABLE IF NOT EXISTS diagnoses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   image_url TEXT,
@@ -26,7 +26,7 @@ CREATE TABLE diagnoses (
 );
 
 -- 3. Create Leads Table (Zapier Submissions)
-CREATE TABLE leads (
+CREATE TABLE IF NOT EXISTS leads (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   diagnosis_id UUID REFERENCES diagnoses(id) ON DELETE CASCADE,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
@@ -37,7 +37,7 @@ CREATE TABLE leads (
 );
 
 -- 4. Create Credits Table
-CREATE TABLE user_credits (
+CREATE TABLE IF NOT EXISTS user_credits (
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
   balance INTEGER DEFAULT 3, -- 3 free scans for new users
   last_topup TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -52,14 +52,19 @@ ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
 
 -- 6. Create RLS Policies
 -- Profiles: Users can only see and edit their own profiles
+DROP POLICY IF EXISTS "Users can view their own profiles" ON profiles;
 CREATE POLICY "Users can view their own profiles" ON profiles FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update their own profiles" ON profiles;
 CREATE POLICY "Users can update their own profiles" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Diagnoses: Users can see and insert their own diagnoses
+DROP POLICY IF EXISTS "Users can view their own diagnoses" ON diagnoses;
 CREATE POLICY "Users can view their own diagnoses" ON diagnoses FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert their own diagnoses" ON diagnoses;
 CREATE POLICY "Users can insert their own diagnoses" ON diagnoses FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- User Credits: Users can see their own balance
+DROP POLICY IF EXISTS "Users can view their own credits" ON user_credits;
 CREATE POLICY "Users can view their own credits" ON user_credits FOR SELECT USING (auth.uid() = user_id);
 
 -- 7. Trigger to automatically create a profile and grant credits on signup
@@ -78,6 +83,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();

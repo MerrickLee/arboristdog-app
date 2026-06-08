@@ -5,6 +5,8 @@ export interface Profile {
   full_name: string;
   email: string;
   phone?: string;
+  zip_code?: string;
+  in_target_area?: boolean;
   is_almstead_customer: boolean;
   has_onboarded: boolean;
   onboarding_answers?: any;

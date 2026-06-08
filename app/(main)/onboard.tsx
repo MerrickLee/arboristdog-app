@@ -23,6 +23,11 @@ export default function OnboardScreen() {
         .from('profiles')
         .update({ has_onboarded: true })
         .eq('id', user.id);
+        
+      // Fire and forget: check if they are an Almstead customer in the background
+      supabase.functions.invoke('lookup-customer').catch((err) => {
+        console.log("Customer lookup skipped or failed:", err);
+      });
     }
     setHasOnboarded(true);
     router.replace('/(main)/capture');
