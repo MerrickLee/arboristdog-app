@@ -6,8 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Mock valid zip codes for testing until the API link is ready
-const MOCK_VALID_ZIPS = ["10580", "10581", "10582"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -35,11 +33,15 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    // TODO: Replace this mock check with the actual API link when provided
-    const inTargetArea = MOCK_VALID_ZIPS.includes(zipcode.trim());
-
-    // Update using service role
+    // Query the native service_areas table for the zip code
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: validZip } = await supabaseAdmin
+      .from('service_areas')
+      .select('zip_code')
+      .eq('zip_code', zipcode.trim())
+      .single();
+
+    const inTargetArea = !!validZip;
 
     // 1. Update Profile
     await supabaseAdmin
