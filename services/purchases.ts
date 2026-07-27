@@ -1,19 +1,20 @@
 import Purchases from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || '';
+const REVENUECAT_IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || '';
+const REVENUECAT_ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || '';
 
 export const initPurchases = async () => {
-  if (!REVENUECAT_API_KEY) {
-    console.warn("RevenueCat API Key not found. Purchases will not be initialized.");
+  const apiKey = Platform.OS === 'ios' ? REVENUECAT_IOS_API_KEY : REVENUECAT_ANDROID_API_KEY;
+
+  if (!apiKey || apiKey.includes('placeholder')) {
+    console.warn(`RevenueCat API Key for ${Platform.OS} not found or is placeholder. Purchases will not be initialized.`);
     return;
   }
 
   try {
-    // In a real app, you might have different keys for iOS and Android
-    // For now, we use the provided key for both or as a fallback
-    await Purchases.configure({ apiKey: REVENUECAT_API_KEY });
-    console.log("[Purchases] RevenueCat initialized successfully");
+    await Purchases.configure({ apiKey });
+    console.log(`[Purchases] RevenueCat initialized successfully for ${Platform.OS}`);
   } catch (error) {
     console.error("[Purchases] Failed to initialize RevenueCat:", error);
   }
