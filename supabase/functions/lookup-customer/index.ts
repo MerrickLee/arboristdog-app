@@ -60,6 +60,19 @@ serve(async (req) => {
       throw new Error("Invalid ACORN API tokens received");
     }
 
+    // Get profile email (in case user updated a private relay email to their real one)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.warn("Failed to fetch profile email, falling back to auth user email:", profileError);
+    }
+    const emailToLookup = profile?.email || user.email;
+
     // 2. Lookup Customer by Email
     const lookupRes = await fetch("https://acorn.almstead.com/api/v1/customerinfo/get-customer-info", {
       method: "POST",
@@ -69,7 +82,7 @@ serve(async (req) => {
         "x-xsrf-token": xsrfToken,
         "referer": "https://acorn.almstead.com"
       },
-      body: JSON.stringify({ email: user.email })
+      body: JSON.stringify({ email: emailToLookup })
     });
 
     if (!lookupRes.ok && lookupRes.status !== 404) {

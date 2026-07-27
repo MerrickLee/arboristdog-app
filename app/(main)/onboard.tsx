@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { Button } from '../../components/ui/Button';
@@ -16,15 +16,78 @@ export default function OnboardScreen() {
   useTrackScreen('Onboarding');
 
   const handleNext = async () => {
+    // Check if the user signed in with Apple's Hide My Email
+    const isPrivateRelay = user?.email?.toLowerCase().includes('privaterelay.appleid.com');
+
+    if (isPrivateRelay) {
+      Alert.alert(
+        "Private Email Detected",
+        "You used Apple's 'Hide My Email'. If you are an Almstead customer, we need your real email to link your account and unlock free unlimited scans.\n\nWould you like to enter your real email?",
+        [
+          {
+            text: "Keep Private",
+            onPress: () => completeOnboarding(user.email)
+          },
+          {
+            text: "Use Real Email",
+            onPress: () => promptForRealEmail()
+          }
+        ]
+      );
+    } else {
+      await completeOnboarding(user?.email || '');
+    }
+  };
+
+  const promptForRealEmail = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        "Enter Real Email",
+        "Please enter the email associated with your Almstead account to unlock free unlimited scans:",
+        [
+          {
+            text: "Cancel",
+            onPress: () => completeOnboarding(user?.email || ''),
+            style: "cancel"
+          },
+          {
+            text: "Link Account",
+            onPress: async (enteredEmail) => {
+              if (!enteredEmail || !enteredEmail.includes('@')) {
+                Alert.alert("Invalid Email", "Please enter a valid email address.", [
+                  { text: "Try Again", onPress: () => promptForRealEmail() },
+                  { text: "Cancel", onPress: () => completeOnboarding(user?.email || '') }
+                ]);
+                return;
+              }
+              await completeOnboarding(enteredEmail.trim().toLowerCase());
+            }
+          }
+        ],
+        "plain-text"
+      );
+    } else {
+      completeOnboarding(user?.email || '');
+    }
+  };
+
+  const completeOnboarding = async (finalEmail: string) => {
     trackEvent('onboarding_completed');
-    // Persist to Supabase so it survives app restarts
     if (user?.id) {
+      const updates: any = { has_onboarded: true };
+      if (finalEmail && finalEmail !== user.email) {
+        updates.email = finalEmail;
+      }
+
       await supabase
         .from('profiles')
-        .update({ has_onboarded: true })
+        .update(updates)
         .eq('id', user.id);
-        
-      // Fire and forget: check if they are an Almstead customer in the background
+
+      // Update the local state
+      useAuthStore.getState().setUser({ ...user, ...updates });
+
+      // Run customer lookup in background
       supabase.functions.invoke('lookup-customer').catch((err) => {
         console.log("Customer lookup skipped or failed:", err);
       });
