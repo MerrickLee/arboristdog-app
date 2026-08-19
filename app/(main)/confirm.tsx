@@ -10,6 +10,8 @@ import { sendLead } from '../../services/zapier';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
+const TIMES = ['Morning', 'Afternoon', 'Evening'];
+
 export default function ConfirmScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -22,6 +24,9 @@ export default function ConfirmScreen() {
     remoteImageUrl,
     resetSession
   } = useDiagnosisStore();
+  const [notes, setNotes] = useState('');
+  const [preferredTime, setPreferredTime] = useState('morning');
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async () => {
     if (!user || !location || !result) return;

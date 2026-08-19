@@ -7,20 +7,31 @@ import { BackArrow, LocationIcon } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { ProgressDots } from '../../components/ui/ProgressDots';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
 export default function LocationScreen() {
   const router = useRouter();
   const { setLocation } = useDiagnosisStore();
+  const { user } = useAuthStore();
 
   useTrackScreen('Location');
+  const [address, setAddress] = useState(user?.address || '');
+  const [propertyType, setPropertyType] = useState<'residential' | 'commercial'>(
+    user?.property_type || 'residential'
+  );
   const [structuredAddress, setStructuredAddress] = useState<{
     street?: string;
     city?: string;
     state?: string;
     zip?: string;
-  }>({});
+  }>({
+    street: user?.address?.split(',')[0]?.trim() || '',
+    city: user?.city || '',
+    state: user?.state || '',
+    zip: user?.zip || '',
+  });
 
   const handleGPSLocation = async () => {
     trackEvent('location_method_used', { method: 'gps' });

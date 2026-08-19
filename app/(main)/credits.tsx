@@ -8,6 +8,7 @@ import { useCreditStore } from '../../stores/creditStore';
 import { useAuthStore } from '../../stores/authStore';
 import { getAvailableOfferings, purchasePackage, restorePurchases } from '../../services/purchases';
 import { syncPurchasedCredits } from '../../services/credits';
+import { supabase } from '../../services/supabase';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
@@ -21,6 +22,13 @@ export default function CreditsScreen() {
   const [processing, setProcessing] = useState(false);
   const [zipInput, setZipInput] = useState('');
   const [verifyingZip, setVerifyingZip] = useState(false);
+
+  // Calculate dynamic reset date (1st of next month)
+  const getResetDate = () => {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return nextMonth.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
 
   useTrackScreen('Credits');
 
@@ -127,12 +135,12 @@ export default function CreditsScreen() {
         <View style={styles.balanceContainer}>
           <Text style={styles.balanceLabel}>SCANS REMAINING</Text>
           <Text style={styles.balanceNum}>{creditsRemaining}</Text>
-          <Text style={styles.balanceSub}>Resets May 1, 2026</Text>
+          <Text style={styles.balanceSub}>Resets {getResetDate()}</Text>
         </View>
 
         {loading ? (
           <ActivityIndicator color={COLORS.leafAccent} />
-        ) : offering && (
+        ) : offering && offering.availablePackages?.length > 0 ? (
           offering.availablePackages.map((pack: any) => (
             <View key={pack.identifier} style={styles.packCard}>
               <View style={styles.bestValueBadge}>
@@ -156,6 +164,13 @@ export default function CreditsScreen() {
               </Button>
             </View>
           ))
+        ) : !loading && (
+          <View style={styles.emptyOfferingsCard}>
+            <Text style={styles.emptyOfferingsTitle}>No packages available yet</Text>
+            <Text style={styles.emptyOfferingsSub}>
+              In-app purchase packages are being set up. In the meantime, you can earn free scans by verifying your zip code below or by being an Almstead customer.
+            </Text>
+          </View>
         )}
 
         <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
@@ -453,5 +468,26 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: '700',
     fontSize: 14,
+  },
+  emptyOfferingsCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+  },
+  emptyOfferingsTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  emptyOfferingsSub: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
   },
 });

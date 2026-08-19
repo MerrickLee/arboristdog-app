@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
+import { LogBox } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useAuthStore } from '../stores/authStore';
 import { useCreditStore } from '../stores/creditStore';
 import { initAnalytics, trackEvent, identifyUser } from '../services/analytics';
 import { initPurchases } from '../services/purchases';
 import { supabase } from '../services/supabase';
+
+// Suppress RevenueCat offerings error in simulator (no StoreKit config via CLI builds)
+LogBox.ignoreLogs(['[RevenueCat]', 'Error fetching offerings']);
 
 export default function RootLayout() {
   const { user, isLoading, setUser, setLoading } = useAuthStore();
@@ -102,6 +106,9 @@ export default function RootLayout() {
       // Redirect away from the sign-in page.
       if (!user.has_onboarded) {
         router.replace('/(main)/onboard');
+      } else if (!user.zip) {
+        // User has onboarded but hasn't set their location yet
+        router.replace('/(main)/onboard-location');
       } else {
         router.replace('/(main)/capture');
       }

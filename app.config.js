@@ -21,8 +21,5 @@ export default ({ config }) => ({
   },
   extra: {
     ...config.extra,
-    eas: {
-      projectId: "your-project-id-here" // This will be automatically populated by EAS
-    }
   }
 });

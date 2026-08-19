@@ -11,6 +11,9 @@ export default function MainLayout() {
       <Stack.Screen name="results" />
       <Stack.Screen name="credits" options={{ presentation: 'modal' }} />
       <Stack.Screen name="confirm" />
+      <Stack.Screen name="history" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="onboard-location" />
     </Stack>
   );
 }

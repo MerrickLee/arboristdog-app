@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
-import { CameraIcon, TreeIcon, BackArrow } from '../../components/ui/Icons';
+import { CameraIcon, TreeIcon, BackArrow, ClockIcon, GearIcon, FlashIcon, GalleryIcon } from '../../components/ui/Icons';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
@@ -15,6 +15,7 @@ export default function CaptureScreen() {
   const cameraRef = useRef<CameraView>(null);
   const { setCapturedImage } = useDiagnosisStore();
   const [isReady, setIsReady] = useState(false);
+  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
 
   useTrackScreen('Capture');
 
@@ -66,11 +67,19 @@ export default function CaptureScreen() {
 
   return (
     <View style={styles.container}>
-      <CameraView style={styles.camera} ref={cameraRef} onCameraReady={() => setIsReady(true)}>
+      <CameraView style={styles.camera} ref={cameraRef} flash={flashMode} onCameraReady={() => setIsReady(true)}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <BackArrow />
           </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(main)/history')}>
+              <ClockIcon size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(main)/settings')}>
+              <GearIcon size={18} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
         
         {/* Viewfinder Frame */}
@@ -102,9 +111,7 @@ export default function CaptureScreen() {
         
         <View style={styles.buttonRow}>
           <TouchableOpacity style={styles.galleryButton} onPress={handleGallery}>
-            <View style={styles.galleryIcon}>
-              <View style={styles.galleryInner} />
-            </View>
+            <GalleryIcon size={22} color="#fff" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.captureButtonOuter} onPress={handleCapture}>
@@ -113,8 +120,11 @@ export default function CaptureScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.flashButton}>
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>⚡️</Text>
+          <TouchableOpacity
+            style={[styles.flashButton, flashMode === 'on' && styles.flashButtonActive]}
+            onPress={() => setFlashMode(prev => prev === 'off' ? 'on' : 'off')}
+          >
+            <FlashIcon size={20} color={flashMode === 'on' ? COLORS.leafAccent : '#fff'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -133,6 +143,24 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: 56,
     paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBtnIcon: {
+    fontSize: 16,
   },
   backButton: {
     width: 36,
@@ -241,6 +269,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  flashButtonActive: {
+    backgroundColor: 'rgba(123,201,80,0.2)',
+    borderColor: COLORS.leafAccent,
   },
   captureButtonOuter: {
     width: 72,
