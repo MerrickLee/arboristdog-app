@@ -69,9 +69,9 @@ export default function CaptureScreen() {
     <View style={styles.container}>
       <CameraView style={styles.camera} ref={cameraRef} flash={flashMode} onCameraReady={() => setIsReady(true)}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <BackArrow />
-          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            {/* Empty space where back button used to be */}
+          </View>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(main)/history')}>
               <ClockIcon size={18} color="#fff" />
