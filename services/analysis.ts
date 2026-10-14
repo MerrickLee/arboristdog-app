@@ -19,38 +19,21 @@ export const performAnalysis = async (userId: string, imageUri: string, context:
       },
     });
 
-    if (edgeError) throw edgeError;
-
-    // 3. Save diagnosis to Database
-    const { data: savedDiagnosis, error: dbError } = await supabase
-      .from('diagnoses')
-      .insert({
-        user_id: userId,
-        image_url: uploadResult.url,
-        symptoms: context.symptoms,
-        description: context.description,
-        condition_name: analysisResult.condition_name,
-        confidence: analysisResult.confidence,
-        severity: analysisResult.severity,
-        diagnosis_json: analysisResult,
-        location_json: context.location,
-      })
-      .select()
-      .single();
-
-    if (dbError) throw dbError;
-
-    // 4. Deduct credit (Simplified - in prod use a database transaction/trigger)
-    await supabase.rpc('deduct_credit', { user_id: userId });
+    if (edgeError) {
+      const response = (edgeError as { context?: Response }).context;
+      const details = response ? await response.json().catch(() => null) : null;
+      throw new Error(details?.error || edgeError.message);
+    }
 
     return { 
       success: true, 
       result: analysisResult, 
-      diagnosisId: savedDiagnosis.id,
+      diagnosisId: analysisResult.diagnosisId,
+      balance: analysisResult.balance,
       imageUrl: uploadResult.url 
     };
   } catch (error) {
     console.error("[Analysis] Error:", error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Analysis failed' };
   }
 };

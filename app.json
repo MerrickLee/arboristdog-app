@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "Arborist Dog",
-    "slug": "arboristdog-app",
+    "slug": "arborist-dog",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "arboristdogapp",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.almstead.arboristdog",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "config": {},
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.almstead.arboristdog",
@@ -29,6 +33,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/with-ios-scenes.cjs",
       "expo-router",
       [
         "expo-splash-screen",
@@ -43,11 +48,38 @@
         }
       ],
       "expo-secure-store",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Arborist Dog to photograph plants for diagnosis.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Arborist Dog to select plant photos for diagnosis.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Arborist Dog to use your location for regional plant care recommendations. Almstead crew members can also choose to share their location with a customer while driving to that customer's job."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c49be408-323c-4575-b916-01f1efed59c2"
+      }
+    },
+    "owner": "merrickalmstead"
   }
 }

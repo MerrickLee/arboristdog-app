@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
 import { COLORS } from '../../constants/theme';
 
 interface ButtonProps {
@@ -7,9 +7,10 @@ interface ButtonProps {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'dark' | 'outline';
   style?: ViewStyle;
+  disabled?: boolean;
 }
 
-export const Button = ({ children, onPress, variant = 'primary', style }: ButtonProps) => {
+export const Button = ({ children, onPress, variant = 'primary', style, disabled = false }: ButtonProps) => {
   const getVariantStyles = () => {
     switch (variant) {
       case 'primary':
@@ -53,8 +54,11 @@ export const Button = ({ children, onPress, variant = 'primary', style }: Button
   return (
     <TouchableOpacity
       activeOpacity={0.8}
+      accessibilityRole="button"
+      disabled={disabled}
+      accessibilityState={{ disabled }}
       onPress={onPress}
-      style={[styles.button, vStyles.container, style]}
+      style={[styles.button, vStyles.container, style, disabled && { opacity: 0.5 }]}
     >
       <Text style={[styles.text, vStyles.text]}>{children}</Text>
     </TouchableOpacity>

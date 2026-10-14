@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React from 'react';
 import {
   View,
@@ -6,10 +7,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
-import { BackArrow, TreeRingPaw, LocationIcon, TreeIcon, ClockIcon } from '../../components/ui/Icons';
+import { BackArrow, TreeRingPaw, LocationIcon, TreeIcon, ClockIcon, CalendarIcon } from '../../components/ui/Icons';
 import { useAuthStore } from '../../stores/authStore';
 import { useCreditStore } from '../../stores/creditStore';
 import { supabase } from '../../services/supabase';
@@ -18,6 +20,7 @@ import { trackEvent } from '../../services/analytics';
 import Constants from 'expo-constants';
 
 export default function SettingsScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { user, setUser } = useAuthStore();
   const { creditsRemaining } = useCreditStore();
@@ -43,18 +46,23 @@ export default function SettingsScreen() {
     );
   };
 
+  const openLegalLink = async (url?: string) => {
+    if (!url) { Alert.alert('Unavailable', 'Please try again later.'); return; }
+    try { await Linking.openURL(url); } catch { Alert.alert('Unable to open link', 'Please try again later.'); }
+  };
+
   const appVersion = Constants.expoConfig?.version || '1.0.0';
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: layout.footerPaddingBottom }]}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarWrap}>
@@ -124,6 +132,24 @@ export default function SettingsScreen() {
           <Text style={styles.sectionLabel}>ACCOUNT</Text>
           <TouchableOpacity
             style={styles.menuItem}
+            onPress={() => router.push('/(main)/appointments')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.menuIcon, { backgroundColor: 'rgba(123,201,80,0.15)' }]}>
+                <CalendarIcon size={18} color={COLORS.leafAccent} />
+              </View>
+              <View>
+                <Text style={styles.menuTitle}>Appointments & Messages</Text>
+                <Text style={styles.menuSub}>Upcoming visits, crew updates</Text>
+              </View>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 8 }} />
+          <TouchableOpacity
+            style={styles.menuItem}
             onPress={() => router.push('/(main)/history')}
             activeOpacity={0.7}
           >
@@ -143,7 +169,7 @@ export default function SettingsScreen() {
         {/* Legal */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>LEGAL</Text>
-          <View style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => openLegalLink(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL)}>
             <View style={styles.menuLeft}>
               <View style={[styles.menuIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
                 <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>☰</Text>
@@ -151,9 +177,9 @@ export default function SettingsScreen() {
               <Text style={styles.menuTitle}>Privacy Policy</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.divider} />
-          <View style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => openLegalLink('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
             <View style={styles.menuLeft}>
               <View style={[styles.menuIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
                 <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)' }}>☷</Text>
@@ -161,7 +187,7 @@ export default function SettingsScreen() {
               <Text style={styles.menuTitle}>Terms of Service</Text>
             </View>
             <Text style={styles.menuArrow}>›</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Sign Out */}

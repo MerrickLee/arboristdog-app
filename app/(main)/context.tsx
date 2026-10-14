@@ -1,5 +1,6 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { BackArrow, CheckIcon, TreeIcon } from '../../components/ui/Icons';
@@ -16,10 +17,11 @@ const ISSUES = [
 ];
 
 export default function ContextScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
-  const { setContext } = useDiagnosisStore();
-  const [selected, setSelected] = useState<string[]>([]);
-  const [text, setText] = useState("");
+  const { setContext, capturedImage, selectedTags, description } = useDiagnosisStore();
+  const [selected, setSelected] = useState<string[]>(selectedTags);
+  const [text, setText] = useState(description);
 
   useTrackScreen('Context');
 
@@ -28,6 +30,7 @@ export default function ContextScreen() {
       ? selected.filter(x => x !== item)
       : [...selected, item];
     setSelected(nowSelected);
+    setContext(nowSelected, text);
     trackEvent('issue_tag_toggled', { tag: item, selected: !selected.includes(item) });
   };
 
@@ -39,7 +42,7 @@ export default function ContextScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
@@ -47,14 +50,10 @@ export default function ContextScreen() {
       </View>
       
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }}>
-        {/* Mock thumbnail since we don't have the real image URI easily renderable without caching logic here, 
-            but in a real app, it would be an Image component with uri = useDiagnosisStore().capturedImage */}
-        <View style={styles.thumbnail}>
-          <TreeIcon size={32} color="rgba(123,201,80,0.5)" />
-          <View style={styles.checkBadge}>
-            <CheckIcon />
-          </View>
-        </View>
+        {!layout.expanded && <View style={styles.thumbnail}>
+          {capturedImage ? <Image source={{ uri: capturedImage }} style={styles.thumbnailImage} accessibilityLabel="Captured landscape photo" /> : <TreeIcon size={32} color="rgba(123,201,80,0.5)" />}
+          <View style={styles.checkBadge}><CheckIcon /></View>
+        </View>}
 
         <Text style={styles.title}>Describe the issue</Text>
         <Text style={styles.subtitle}>Select all that apply, then add any extra details.</Text>
@@ -65,6 +64,8 @@ export default function ContextScreen() {
             return (
               <TouchableOpacity
                 key={issue}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
                 style={[
                   styles.tag,
                   isSelected ? styles.tagSelected : styles.tagUnselected
@@ -88,12 +89,12 @@ export default function ContextScreen() {
           placeholderTextColor="rgba(255,255,255,0.4)"
           multiline
           value={text}
-          onChangeText={setText}
+          onChangeText={value => { setText(value); setContext(selected, value); }}
           textAlignVertical="top"
         />
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <ProgressDots current={1} total={4} />
         <View style={{ marginTop: 16 }}>
           <Button onPress={handleNext}>Continue</Button>
@@ -146,6 +147,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     position: 'relative',
   },
+  thumbnailImage: { width: '100%', height: '100%', borderRadius: 12 },
   checkBadge: {
     position: 'absolute',
     bottom: -8,
@@ -170,6 +172,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   tag: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 20,

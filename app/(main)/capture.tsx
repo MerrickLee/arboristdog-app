@@ -1,29 +1,34 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Linking } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
-import { CameraIcon, TreeIcon, BackArrow, ClockIcon, GearIcon, FlashIcon, GalleryIcon } from '../../components/ui/Icons';
+import { CameraIcon, TreeIcon, TreeRingPaw, ClockIcon, GearIcon, FlashIcon, GalleryIcon } from '../../components/ui/Icons';
 import { useDiagnosisStore } from '../../stores/diagnosisStore';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
+import { ActiveTripPill, AppointmentsButton } from '../../components/appointments/EntryPoints';
 
 export default function CaptureScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
-  const { setCapturedImage } = useDiagnosisStore();
+  const { setCapturedImage, resetSession } = useDiagnosisStore();
+  const permissionRequested = useRef(false);
   const [isReady, setIsReady] = useState(false);
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
 
   useTrackScreen('Capture');
 
   useEffect(() => {
-    if (!permission?.granted) {
-      requestPermission();
+    if (permission && !permission.granted && permission.canAskAgain && !permissionRequested.current) {
+      permissionRequested.current = true;
+      requestPermission().catch(() => Alert.alert('Camera unavailable', 'You can choose a photo from your library instead.'));
     }
-  }, [permission]);
+  }, [permission, requestPermission]);
 
   const handleCapture = async () => {
     trackEvent('photo_captured', { method: 'camera' });
@@ -34,10 +39,11 @@ export default function CaptureScreen() {
           quality: 0.8,
         });
         if (photo?.uri) {
+          resetSession();
           setCapturedImage(photo.uri);
           router.push('/(main)/context');
         }
-      } catch (error) {
+      } catch {
         Alert.alert('Error', 'Failed to capture photo.');
       }
     }
@@ -52,31 +58,42 @@ export default function CaptureScreen() {
     });
 
     if (!result.canceled && result.assets[0]?.uri) {
+      resetSession();
       setCapturedImage(result.assets[0].uri);
       router.push('/(main)/context');
     }
   };
 
+  const frameSize = Math.max(100, Math.min(260, (layout.expanded ? layout.supportWidth : layout.mainWidth) - 48, layout.height - 230));
+
   if (!permission?.granted) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ color: '#fff' }}>We need your permission to show the camera</Text>
-      </View>
+      <ScrollView style={styles.container} contentContainerStyle={[styles.permissionContent, { paddingTop: layout.headerPaddingTop, paddingBottom: layout.footerPaddingBottom }]}>
+        <TreeRingPaw size={80} />
+        <Text style={styles.permissionTitle}>Enable your camera</Text>
+        <Text style={styles.instruction}>We need your permission to show the camera.</Text>
+        <TouchableOpacity accessibilityRole="button" style={styles.permissionButton} onPress={() => permission?.canAskAgain ? requestPermission() : Linking.openSettings()}>
+          <Text style={styles.permissionButtonText}>{permission?.canAskAgain ? 'Allow Camera Access' : 'Open Settings'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" style={styles.permissionButton} onPress={handleGallery}><Text style={styles.permissionButtonText}>Choose from photos</Text></TouchableOpacity>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, layout.expanded && styles.expandedContainer]}>
+      <View style={[styles.cameraPane, layout.expanded && { flexBasis: layout.supportWidth, flexGrow: 0, flexShrink: 0 }]}>
       <CameraView style={styles.camera} ref={cameraRef} flash={flashMode} onCameraReady={() => setIsReady(true)}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: layout.headerPaddingTop }, layout.expanded && { display: 'none' }]}>
           <View style={styles.headerLeft}>
-            {/* Empty space where back button used to be */}
+            <ActiveTripPill />
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(main)/history')}>
+            <AppointmentsButton />
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Scan History" style={styles.headerBtn} onPress={() => router.push('/(main)/history')}>
               <ClockIcon size={18} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(main)/settings')}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Settings" style={styles.headerBtn} onPress={() => router.push('/(main)/settings')}>
               <GearIcon size={18} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -84,7 +101,7 @@ export default function CaptureScreen() {
         
         {/* Viewfinder Frame */}
         <View style={styles.viewfinderContainer}>
-          <View style={styles.viewfinder}>
+          <View style={[styles.viewfinder, { width: frameSize, height: frameSize }]}>
             {/* Corners would be CSS borders in web, here we use absolute positioned views */}
             <View style={[styles.corner, styles.topLeft]} />
             <View style={[styles.corner, styles.topRight]} />
@@ -100,39 +117,58 @@ export default function CaptureScreen() {
 
         {/* Scan Ready Badge */}
         {isReady && (
-          <View style={styles.scanReadyBadge}>
+          <View style={[styles.scanReadyBadge, { top: layout.headerPaddingTop + 48 }]}>
             <Text style={styles.scanReadyText}>SCAN READY</Text>
           </View>
         )}
       </CameraView>
-
-      <View style={styles.controls}>
+      </View>
+      <ScrollView style={[styles.controlsPane, layout.expanded ? styles.expandedControlsPane : { height: 160 + layout.footerPaddingBottom }]} contentContainerStyle={[styles.controls, { paddingBottom: layout.footerPaddingBottom }, layout.expanded && styles.expandedControls]}>
+        {layout.expanded && <View style={styles.captureIntro}>
+          <TreeRingPaw size={72} />
+          <Text style={styles.permissionTitle}>Snap a photo</Text>
+          <Text style={styles.instruction}>Point at the tree, shrub, or lawn issue.</Text>
+        </View>}
         <Text style={styles.instruction}>Capture the affected area clearly</Text>
         
         <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.galleryButton} onPress={handleGallery}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Choose from photos" style={styles.galleryButton} onPress={handleGallery}>
             <GalleryIcon size={22} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.captureButtonOuter} onPress={handleCapture}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Capture landscape photo" disabled={!isReady} style={[styles.captureButtonOuter, !isReady && { opacity: 0.5 }]} onPress={handleCapture}>
             <View style={styles.captureButtonInner}>
               <CameraIcon />
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Toggle flash"
+            accessibilityState={{ selected: flashMode === 'on' }}
             style={[styles.flashButton, flashMode === 'on' && styles.flashButtonActive]}
             onPress={() => setFlashMode(prev => prev === 'off' ? 'on' : 'off')}
           >
             <FlashIcon size={20} color={flashMode === 'on' ? COLORS.leafAccent : '#fff'} />
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  cameraPane: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 150 },
+  controlsPane: { flexGrow: 0, flexShrink: 0 },
+  expandedContainer: { flexDirection: 'row' },
+  expandedControlsPane: { flexGrow: 1, flexShrink: 1, flexBasis: 0, backgroundColor: COLORS.canopyDark },
+  expandedControls: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, backgroundColor: COLORS.canopyDark },
+  captureIntro: { alignItems: 'center', marginBottom: 30 },
+  permissionContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  permissionTitle: { color: '#fff', fontSize: 26, fontWeight: '700', textAlign: 'center', marginVertical: 20 },
+  permissionButton: { backgroundColor: COLORS.almsteadGreen, padding: 16, borderRadius: 14, marginTop: 12, width: '100%', maxWidth: 360, alignItems: 'center' },
+  permissionButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
   container: {
     flex: 1,
     backgroundColor: '#111',

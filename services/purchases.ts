@@ -1,63 +1,56 @@
-import Purchases from 'react-native-purchases';
+import Purchases, { CustomerInfo, PurchasesPackage } from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-const REVENUECAT_IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || '';
-const REVENUECAT_ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || '';
-
-export const initPurchases = async () => {
-  const apiKey = Platform.OS === 'ios' ? REVENUECAT_IOS_API_KEY : REVENUECAT_ANDROID_API_KEY;
-
-  if (!apiKey || apiKey.includes('placeholder')) {
-    console.warn(`RevenueCat API Key for ${Platform.OS} not found or is placeholder. Purchases will not be initialized.`);
-    return;
-  }
-
-  try {
-    await Purchases.configure({ apiKey });
-    console.log(`[Purchases] RevenueCat initialized successfully for ${Platform.OS}`);
-  } catch (error) {
-    console.error("[Purchases] Failed to initialize RevenueCat:", error);
-  }
+let initialization: Promise<void> | undefined;
+export const initPurchases = (): Promise<void> => {
+  if (initialization) return initialization;
+  initialization = (async () => {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') throw new Error('Purchases require a native app build.');
+    const apiKey = Platform.OS === 'ios' ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
+    if (!apiKey || /placeholder|your_.*_here/.test(apiKey)) throw new Error('Purchases are temporarily unavailable. Please try again later.');
+    Purchases.configure({ apiKey });
+  })().catch(error => { initialization = undefined; throw error; });
+  return initialization;
 };
 
-/**
- * Fetch the current offerings from RevenueCat
- */
-export const getAvailableOfferings = async () => {
-  try {
-    const offerings = await Purchases.getOfferings();
-    return offerings.current;
-  } catch (error) {
-    console.error("[Purchases] Error fetching offerings:", error);
-    return null;
-  }
+export const identifyPurchases = async (userId: string) => {
+  await initPurchases();
+  if (await Purchases.getAppUserID() !== userId) await Purchases.logIn(userId);
 };
 
-/**
- * Perform a purchase of a specific package
- */
-export const purchasePackage = async (pack: any) => {
+export const clearPurchaseIdentity = async () => {
+  if (!initialization) return;
+  await initialization;
+  if (!(await Purchases.isAnonymous())) await Purchases.logOut();
+};
+
+export const hasActiveSubscription = (info: CustomerInfo) =>
+  Boolean(info.entitlements.active[process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID || 'premium_access']) &&
+  info.activeSubscriptions.includes('com.almstead.arboristdog.monthly');
+
+export const getAvailableOfferings = async (userId: string) => {
+  await identifyPurchases(userId);
+  return (await Purchases.getOfferings()).current;
+};
+
+export const getPurchaseStatus = async (userId: string) => {
+  await identifyPurchases(userId);
+  await Purchases.invalidateCustomerInfoCache();
+  return Purchases.getCustomerInfo();
+};
+
+export const purchasePackage = async (pack: PurchasesPackage, userId: string) => {
   try {
+    await identifyPurchases(userId);
     const { customerInfo } = await Purchases.purchasePackage(pack);
     return { success: true, customerInfo };
-  } catch (error: any) {
-    if (!error.userCancelled) {
-      console.error("[Purchases] Error during purchase:", error);
-    }
-    return { success: false, error: error.message, cancelled: error.userCancelled };
+  } catch (error: unknown) {
+    const purchaseError = error as { message?: string; userCancelled?: boolean };
+    return { success: false, error: purchaseError.message, cancelled: purchaseError.userCancelled };
   }
 };
 
-/**
- * Restore previous purchases
- */
-export const restorePurchases = async () => {
-  try {
-    const customerInfo = await Purchases.restorePurchases();
-    return { success: true, customerInfo };
-  } catch (error) {
-    console.error("[Purchases] Error restoring purchases:", error);
-    return { success: false, error };
-  }
+export const restorePurchases = async (userId: string) => {
+  await identifyPurchases(userId);
+  return Purchases.restorePurchases();
 };
-

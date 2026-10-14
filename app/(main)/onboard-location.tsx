@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState } from 'react';
 import {
   View,
@@ -14,13 +15,14 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ExpoLocation from 'expo-location';
 import { COLORS } from '../../constants/theme';
-import { LocationIcon, TreeRingPaw } from '../../components/ui/Icons';
+import { LocationIcon } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../stores/authStore';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
 export default function OnboardLocationScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const params = useLocalSearchParams();
   const isEditing = params.edit === 'true';
@@ -28,7 +30,7 @@ export default function OnboardLocationScreen() {
 
   useTrackScreen('OnboardLocation');
 
-  const [street, setStreet] = useState(user?.address || '');
+  const [street, setStreet] = useState(user?.address?.split(',')[0]?.trim() || '');
   const [city, setCity] = useState(user?.city || '');
   const [state, setState] = useState(user?.state || '');
   const [zip, setZip] = useState(user?.zip || '');
@@ -110,7 +112,7 @@ export default function OnboardLocationScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: layout.headerPaddingTop + 16 }]} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.logoSection}>
           <View style={styles.iconWrap}>
@@ -229,7 +231,7 @@ export default function OnboardLocationScreen() {
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <Button onPress={handleSave} disabled={saving}>
           {saving ? 'Saving...' : isEditing ? 'Update Location' : 'Continue'}
         </Button>

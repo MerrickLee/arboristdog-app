@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -11,6 +12,7 @@ import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
 export default function ResultsScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { result } = useDiagnosisStore();
   const { user } = useAuthStore();
@@ -22,7 +24,7 @@ export default function ResultsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(main)/capture')}>
             <BackArrow />
@@ -31,19 +33,19 @@ export default function ResultsScreen() {
         </View>
         <View style={styles.headerContent}>
           <AlertIcon size={24} />
-          <View style={{ marginLeft: 12 }}>
+          <View style={{ marginLeft: 12, flex: 1 }}>
             <Text style={styles.conditionName}>{result.condition_name}</Text>
-            <Text style={styles.severityLabel}>Fungal infection - {result.severity} severity</Text>
+            <Text style={styles.severityLabel}>{result.severity} severity</Text>
           </View>
         </View>
       </View>
 
       <View style={styles.creditsBanner}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
           <View style={styles.creditsBadge}>
-            <Text style={styles.creditsNum}>{creditsRemaining}</Text>
+            <Text style={styles.creditsNum}>{user?.is_almstead_customer ? '∞' : creditsRemaining}</Text>
           </View>
-          <Text style={styles.creditsText}>{creditsRemaining} scans remaining this month</Text>
+          <Text style={styles.creditsText}>{user?.is_almstead_customer ? 'Unlimited scans · Almstead customer' : `${creditsRemaining} scans remaining this month`}</Text>
         </View>
         <TouchableOpacity
           onPress={() => {
@@ -68,7 +70,7 @@ export default function ResultsScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>What's happening</Text>
+          <Text style={styles.cardTitle}>What’s happening</Text>
           <Text style={styles.explanationText}>{result.explanation}</Text>
         </View>
 
@@ -76,8 +78,8 @@ export default function ResultsScreen() {
           <Text style={styles.cardTitle}>Recommended actions</Text>
           {result.actions.map((action, i) => (
             <View key={i} style={styles.actionItem}>
-              <View style={[styles.priorityBadge, { backgroundColor: `${action.color}15` }]}>
-                <Text style={[styles.priorityText, { color: action.color }]}>{action.priority}</Text>
+              <View style={[styles.priorityBadge, { backgroundColor: `${action.color || COLORS.almsteadGreen}15` }]}>
+                <Text style={[styles.priorityText, { color: action.color || COLORS.almsteadGreen }]}>{action.priority}</Text>
               </View>
               <Text style={styles.actionText}>{action.text}</Text>
             </View>
@@ -91,7 +93,7 @@ export default function ResultsScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <Button
           onPress={() => {
             trackEvent('get_expert_help_tapped', {
@@ -189,6 +191,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   creditsText: {
+    flex: 1,
     fontSize: 12,
     color: '#888',
   },

@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -14,18 +15,8 @@ import { BackArrow, AlertIcon, TreeIcon } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { supabase } from '../../services/supabase';
 import { useAuthStore } from '../../stores/authStore';
-import { useDiagnosisStore } from '../../stores/diagnosisStore';
+import { SavedDiagnosis, useDiagnosisStore } from '../../stores/diagnosisStore';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
-
-interface DiagnosisRecord {
-  id: string;
-  condition_name: string;
-  confidence: number;
-  severity: string;
-  image_url: string;
-  diagnosis_json: any;
-  created_at: string;
-}
 
 const SEVERITY_COLORS: Record<string, string> = {
   low: '#4CAF50',
@@ -34,17 +25,18 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export default function HistoryScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { user } = useAuthStore();
-  const { setResult } = useDiagnosisStore();
-  const [diagnoses, setDiagnoses] = useState<DiagnosisRecord[]>([]);
+  const { restoreDiagnosis, historyPreview, setHistoryPreview } = useDiagnosisStore();
+  const [diagnoses, setDiagnoses] = useState<SavedDiagnosis[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useTrackScreen('History');
 
   const fetchDiagnoses = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id) { setLoading(false); setRefreshing(false); setHistoryPreview(null); return; }
     try {
       const { data, error } = await supabase
         .from('diagnoses')
@@ -55,8 +47,11 @@ export default function HistoryScreen() {
       if (error) {
         console.error('[History] Supabase error:', error.message);
         setDiagnoses([]);
+        setHistoryPreview(null);
       } else if (data) {
         setDiagnoses(data);
+        const previousId = useDiagnosisStore.getState().historyPreview?.id;
+        setHistoryPreview(data.find(item => item.id === previousId) || null);
       }
     } catch (err) {
       console.error('[History] Failed to fetch diagnoses:', err);
@@ -65,7 +60,7 @@ export default function HistoryScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id]);
+  }, [user?.id, setHistoryPreview]);
 
   useFocusEffect(
     useCallback(() => {
@@ -78,11 +73,13 @@ export default function HistoryScreen() {
     fetchDiagnoses();
   };
 
-  const handleViewDiagnosis = (diagnosis: DiagnosisRecord) => {
-    // Populate the diagnosis store with the saved result
+  const handleViewDiagnosis = (diagnosis: SavedDiagnosis) => {
     if (diagnosis.diagnosis_json) {
-      setResult(diagnosis.diagnosis_json);
-      router.push('/(main)/results');
+      setHistoryPreview(diagnosis);
+      if (!layout.expanded) {
+        restoreDiagnosis(diagnosis);
+        router.push('/(main)/results');
+      }
     }
   };
 
@@ -102,7 +99,7 @@ export default function HistoryScreen() {
   if (!loading && diagnoses.length === 0) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <BackArrow />
           </TouchableOpacity>
@@ -128,7 +125,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
@@ -151,10 +148,12 @@ export default function HistoryScreen() {
             />
           }
         >
-          {diagnoses.map((diagnosis, index) => (
+          {diagnoses.map(diagnosis => (
             <TouchableOpacity
               key={diagnosis.id}
-              style={styles.card}
+              style={[styles.card, historyPreview?.id === diagnosis.id && styles.selectedCard]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: historyPreview?.id === diagnosis.id }}
               onPress={() => handleViewDiagnosis(diagnosis)}
               activeOpacity={0.7}
             >
@@ -253,6 +252,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
+  selectedCard: { borderColor: COLORS.leafAccent },
   cardTop: {
     flexDirection: 'row',
     alignItems: 'center',

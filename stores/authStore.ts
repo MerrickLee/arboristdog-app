@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
+import { withTimeout } from '../utils/withTimeout';
 
 export interface Profile {
   id: string;
@@ -38,16 +39,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateProfile: async (updates) => {
     const user = get().user;
     if (!user) return false;
+    const controller = new AbortController();
     try {
-      const { error } = await supabase
+      const { error } = await withTimeout(supabase
         .from('profiles')
         .update(updates)
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .abortSignal(controller.signal),
+        15000,
+        'Saving is taking too long. Please check your connection and try again.',
+        () => controller.abort(),
+      );
       if (error) {
         console.error('[AuthStore] Failed to update profile:', error.message);
         return false;
       }
-      set({ user: { ...user, ...updates } });
+      const currentUser = get().user;
+      if (currentUser?.id !== user.id) return false;
+      set({ user: { ...currentUser, ...updates } });
       return true;
     } catch (err) {
       console.error('[AuthStore] Update profile error:', err);

@@ -1,23 +1,28 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
+import { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput, ScrollView, Linking, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { BackArrow, TreeRingPaw } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
 import { useCreditStore } from '../../stores/creditStore';
 import { useAuthStore } from '../../stores/authStore';
-import { getAvailableOfferings, purchasePackage, restorePurchases } from '../../services/purchases';
+import { getAvailableOfferings, purchasePackage, restorePurchases, getPurchaseStatus, hasActiveSubscription } from '../../services/purchases';
 import { syncPurchasedCredits } from '../../services/credits';
 import { supabase } from '../../services/supabase';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
 export default function CreditsScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { user } = useAuthStore();
-  const { creditsRemaining, addCredits } = useCreditStore();
+  const { creditsRemaining, setCreditsRemaining } = useCreditStore();
   const [purchased, setPurchased] = useState(false);
-  const [offering, setOffering] = useState<any>(null);
+  const [offering, setOffering] = useState<PurchasesOffering | null>(null);
+  const [subscriptionActive, setSubscriptionActive] = useState(false);
+  const [creditsAdded, setCreditsAdded] = useState(0);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [zipInput, setZipInput] = useState('');
@@ -34,49 +39,69 @@ export default function CreditsScreen() {
 
   React.useEffect(() => {
     fetchOfferings();
-  }, []);
+    const listener = AppState.addEventListener('change', state => {
+      if (state === 'active') fetchOfferings();
+    });
+    return () => listener.remove();
+  }, [user?.id]);
 
   const fetchOfferings = async () => {
-    const currentOffering = await getAvailableOfferings();
-    setOffering(currentOffering);
-    setLoading(false);
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      setOffering(await getAvailableOfferings(user.id));
+      setSubscriptionActive(hasActiveSubscription(await getPurchaseStatus(user.id)));
+      await refreshBalance();
+    } catch {
+      setOffering(null);
+    } finally { setLoading(false); }
   };
 
-  const handlePurchase = async (pack: any) => {
-    if (!user) return;
-    trackEvent('purchase_initiated', { package_id: pack.identifier, price: pack.product.priceString });
+  const refreshBalance = async () => {
+    const result = await syncPurchasedCredits();
+    setCreditsRemaining(result.balance);
+    setCreditsAdded(result.creditsAdded);
+    setSubscriptionActive(result.subscriptionActive);
+    return result;
+  };
+
+  const handlePurchase = async (pack: PurchasesPackage) => {
+    if (!user || processing) return;
     setProcessing(true);
-    const response = await purchasePackage(pack);
-    
-    if (response.success) {
-      const amount = pack.packageType === 'MONTHLY' ? 10 : (pack.product.metadata?.credit_count || 3);
-      const sync = await syncPurchasedCredits(user.id, amount);
-      if (sync.success) {
-        addCredits(amount);
+    try {
+      trackEvent('purchase_initiated', { package_id: pack.identifier });
+      const response = await purchasePackage(pack, user.id);
+      if (response.success) {
+        await refreshBalance();
         setPurchased(true);
-        trackEvent('purchase_completed', { package_id: pack.identifier, credits_added: amount });
-      } else {
-        Alert.alert("Success, but...", "Payment was successful, but we had trouble syncing your credits. Please try 'Restore Purchases'.");
+        trackEvent('purchase_completed', { package_id: pack.identifier });
+      } else if (!response.cancelled) {
+        Alert.alert('Purchase not completed', response.error || 'Please try again.');
       }
-    } else if (!response.cancelled) {
-      trackEvent('purchase_failed', { package_id: pack.identifier, error: response.error });
-      Alert.alert("Purchase failed", response.error || "Something went wrong.");
-    }
-    setProcessing(false);
+    } catch (error) {
+      Alert.alert('Balance update pending', error instanceof Error ? error.message : 'Please try Restore Purchases shortly.');
+    } finally { setProcessing(false); }
   };
 
   const handleRestore = async () => {
+    if (!user || processing) return;
     setProcessing(true);
-    const response = await restorePurchases();
-    if (response.success) {
-      Alert.alert("Check Complete", "Your purchases have been verified and synced.");
-      // In a real app, you'd re-fetch the latest balance from Supabase here
-    }
-    setProcessing(false);
+    try {
+      await restorePurchases(user.id);
+      const result = await refreshBalance();
+      Alert.alert('Purchases checked', `${result.subscriptionActive ? 'Your subscription is active. ' : 'No active subscription found. '}Your balance is ${result.balance} scans. Previously credited purchases are never added twice. Consumable scans remain linked to this Arborist Dog account.`);
+    } catch (error) {
+      Alert.alert('Unable to restore', error instanceof Error ? error.message : 'Please try again.');
+    } finally { setProcessing(false); }
+  };
+
+  const openLink = async (url: string) => {
+    try { await Linking.openURL(url); }
+    catch { Alert.alert('Unable to open link', 'Please try again later.'); }
   };
 
   const verifyZipCode = async () => {
-    if (zipInput.length < 5) {
+    if (!user || !/^\d{5}$/.test(zipInput)) {
       Alert.alert('Invalid Zip', 'Please enter a 5-digit zip code.');
       return;
     }
@@ -109,39 +134,39 @@ export default function CreditsScreen() {
 
   if (purchased) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
+      <ScrollView style={styles.container} contentContainerStyle={[{ flexGrow: 1, paddingTop: layout.headerPaddingTop, paddingBottom: layout.footerPaddingBottom }, { alignItems: 'center', justifyContent: 'center' }]}>
         <View style={styles.successIcon}>
           <Text style={{ fontSize: 24 }}>✓</Text>
         </View>
-        <Text style={styles.title}>Credits added!</Text>
-        <Text style={styles.subtitle}>3 credits have been added to your account.</Text>
+        <Text style={styles.title}>Purchase confirmed</Text>
+        <Text style={styles.subtitle}>{creditsAdded} scans have been added to your account.</Text>
         <Text style={styles.bigCredit}>{creditsRemaining} scans available</Text>
         <View style={{ width: 220 }}>
           <Button variant="secondary" onPress={() => router.back()}>Back to diagnosis</Button>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: layout.footerPaddingBottom }]}>
         <View style={styles.balanceContainer}>
           <Text style={styles.balanceLabel}>SCANS REMAINING</Text>
           <Text style={styles.balanceNum}>{creditsRemaining}</Text>
-          <Text style={styles.balanceSub}>Resets {getResetDate()}</Text>
+          <Text style={styles.balanceSub}>Free monthly scans renew {getResetDate()}</Text>
         </View>
 
         {loading ? (
           <ActivityIndicator color={COLORS.leafAccent} />
         ) : offering && offering.availablePackages?.length > 0 ? (
-          offering.availablePackages.map((pack: any) => (
+          offering.availablePackages.map((pack: PurchasesPackage) => (
             <View key={pack.identifier} style={styles.packCard}>
               <View style={styles.bestValueBadge}>
                 <Text style={styles.bestValueText}>POPULAR</Text>
@@ -153,6 +178,7 @@ export default function CreditsScreen() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text style={styles.packPrice}>{pack.product.priceString}</Text>
+                  <Text style={styles.packPriceSub}>{pack.product.subscriptionPeriod ? ({ P1M: 'Per month', P1Y: 'Per year', P1W: 'Per week' }[pack.product.subscriptionPeriod] || `Period: ${pack.product.subscriptionPeriod}`) : 'One-time purchase'}</Text>
                 </View>
               </View>
               
@@ -168,19 +194,25 @@ export default function CreditsScreen() {
           <View style={styles.emptyOfferingsCard}>
             <Text style={styles.emptyOfferingsTitle}>No packages available yet</Text>
             <Text style={styles.emptyOfferingsSub}>
-              In-app purchase packages are being set up. In the meantime, you can earn free scans by verifying your zip code below or by being an Almstead customer.
+              Purchases are temporarily unavailable. Please try again shortly. In the meantime, you can earn free scans by verifying your zip code below or by being an Almstead customer.
             </Text>
           </View>
         )}
 
-        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
+        {subscriptionActive && <Text style={styles.ctaSub}>Monthly subscription active</Text>}
+        <Text style={styles.ctaSub}>Subscriptions renew automatically unless canceled at least 24 hours before the period ends. Payment is charged to your Apple Account. Manage or cancel in App Store subscriptions. Purchased scan packs do not expire.</Text>
+        <TouchableOpacity style={styles.restoreBtn} onPress={fetchOfferings} disabled={processing}><Text style={styles.restoreText}>Refresh packages</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore} disabled={processing || loading}>
           <Text style={styles.restoreText}>Restore Purchases</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.restoreBtn} onPress={() => openLink('https://apps.apple.com/account/subscriptions')}><Text style={styles.restoreText}>Manage Subscriptions</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.restoreBtn} onPress={() => openLink('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}><Text style={styles.restoreText}>Terms of Use (EULA)</Text></TouchableOpacity>
+        {process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL && <TouchableOpacity style={styles.restoreBtn} onPress={() => openLink(process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL!)}><Text style={styles.restoreText}>Privacy Policy</Text></TouchableOpacity>}
         {!user?.is_almstead_customer && !user?.in_target_area && (
           <View style={styles.zipCodeContainer}>
             <Text style={styles.zipCodeTitle}>Get 5 Free Scans / Month</Text>
-            <Text style={styles.zipCodeSub}>Check if you're in our service area to unlock more free monthly scans.</Text>
+            <Text style={styles.zipCodeSub}>Check if you’re in our service area to unlock more free monthly scans.</Text>
             <View style={styles.zipCodeInputRow}>
               <TextInput 
                 style={styles.zipCodeInput}
@@ -219,7 +251,7 @@ export default function CreditsScreen() {
             </Text>
           </View>
         )}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -242,7 +274,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    flex: 1,
+    paddingBottom: 48,
     paddingHorizontal: 28,
     paddingTop: 24,
   },
@@ -290,6 +322,8 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   packHeader: {
+    flexWrap: 'wrap',
+    gap: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

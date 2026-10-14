@@ -9,11 +9,13 @@ export default function MainLayout() {
       <Stack.Screen name="location" />
       <Stack.Screen name="analyzing" />
       <Stack.Screen name="results" />
-      <Stack.Screen name="credits" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="credits" />
       <Stack.Screen name="confirm" />
       <Stack.Screen name="history" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="onboard-location" />
+      <Stack.Screen name="appointments" />
+      <Stack.Screen name="appointment/[id]" />
     </Stack>
   );
 }

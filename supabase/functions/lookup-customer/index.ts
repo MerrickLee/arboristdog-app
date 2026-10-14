@@ -60,18 +60,11 @@ serve(async (req) => {
       throw new Error("Invalid ACORN API tokens received");
     }
 
-    // Get profile email (in case user updated a private relay email to their real one)
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('email')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-      console.warn("Failed to fetch profile email, falling back to auth user email:", profileError);
+    // Only the verified Auth email may unlock customer benefits.
+    const emailToLookup = user.email;
+    if (!emailToLookup || !user.email_confirmed_at || emailToLookup.toLowerCase().endsWith('@privaterelay.appleid.com')) {
+      return new Response(JSON.stringify({ success: true, isAlmsteadCustomer: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const emailToLookup = profile?.email || user.email;
 
     // 2. Lookup Customer by Email
     const lookupRes = await fetch("https://acorn.almstead.com/api/v1/customerinfo/get-customer-info", {

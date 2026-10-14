@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -13,6 +14,7 @@ import { trackEvent } from '../../services/analytics';
 const TIMES = ['Morning', 'Afternoon', 'Evening'];
 
 export default function ConfirmScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { user } = useAuthStore();
   const {
@@ -38,7 +40,7 @@ export default function ConfirmScreen() {
     // Submit lead to Zapier
     const response = await sendLead({
       user: {
-        name: user.name,
+        name: user.full_name,
         email: user.email,
         phone: user.phone,
       },
@@ -71,11 +73,11 @@ export default function ConfirmScreen() {
 
   if (submitted) {
     return (
-      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }]}>
+      <ScrollView style={styles.container} contentContainerStyle={[{ flexGrow: 1, paddingTop: layout.headerPaddingTop, paddingBottom: layout.footerPaddingBottom }, { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }]}>
         <View style={styles.successIcon}>
           <Text style={{ fontSize: 24 }}>✓</Text>
         </View>
-        <Text style={styles.titleCenter}>You're all set!</Text>
+        <Text style={styles.titleCenter}>You’re all set!</Text>
         <Text style={styles.subtitleCenter}>
           A certified arborist from Almstead will reach out within 24 hours to discuss your diagnosis.
         </Text>
@@ -85,13 +87,13 @@ export default function ConfirmScreen() {
         <View style={{ width: '100%', marginTop: 24 }}>
           <Button variant="secondary" onPress={handleRestart}>Diagnose Another Issue</Button>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
@@ -100,7 +102,7 @@ export default function ConfirmScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Get expert help</Text>
         <Text style={styles.subtitle}>
-          We already have your contact info from sign-in. Just confirm you'd like an ISA-certified arborist to review your diagnosis and follow up.
+          We already have your contact info from sign-in. Just confirm you’d like an ISA-certified arborist to review your diagnosis and follow up.
         </Text>
 
         <View style={styles.summaryCard}>
@@ -110,7 +112,7 @@ export default function ConfirmScreen() {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.rowLabel}>Name</Text>
-            <Text style={styles.rowValue}>{user?.name || 'User'}</Text>
+            <Text style={styles.rowValue}>{user?.full_name || 'User'}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.rowLabel}>Email</Text>
@@ -160,7 +162,7 @@ export default function ConfirmScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <Button onPress={handleSubmit}>Request Free Consultation</Button>
         <TouchableOpacity style={styles.noThanksBtn} onPress={handleRestart}>
           <Text style={styles.noThanksText}>No thanks, just the diagnosis</Text>
@@ -237,6 +239,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
   },
   rowValue: {
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: 12,
     fontSize: 13,
     color: '#fff',
     fontWeight: '500',

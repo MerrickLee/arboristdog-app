@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -12,6 +13,7 @@ import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
 
 export default function LocationScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { setLocation } = useDiagnosisStore();
   const { user } = useAuthStore();
@@ -86,7 +88,7 @@ export default function LocationScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
@@ -144,7 +146,7 @@ export default function LocationScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <ProgressDots current={2} total={4} />
         <View style={{ marginTop: 16 }}>
           <Button onPress={handleNext}>Analyze My Plant</Button>

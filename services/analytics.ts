@@ -1,6 +1,7 @@
 import { CSQ } from "@contentsquare/react-native-bridge";
 
 const HEAP_ENVIRONMENT_ID = process.env.EXPO_PUBLIC_HEAP_ENVIRONMENT_ID || "";
+let analyticsEnabled = false;
 
 export const initAnalytics = () => {
   if (!HEAP_ENVIRONMENT_ID) {
@@ -13,6 +14,7 @@ export const initAnalytics = () => {
       enableRNAutocapture: true,
     });
     CSQ.start();
+    analyticsEnabled = true;
     console.log("[Analytics] Heap initialized successfully");
   } catch (error) {
     console.error("[Analytics] Failed to initialize Heap:", error);
@@ -25,8 +27,9 @@ export const initAnalytics = () => {
  * @param screenName Human-readable screen name, e.g. "Capture", "Results"
  */
 export const trackScreen = (screenName: string) => {
+  if (!analyticsEnabled) return;
   try {
-    CSQ.trackScreen(screenName);
+    CSQ.trackScreenview(screenName);
     console.log(`[Analytics] Screen: ${screenName}`);
   } catch (error) {
     console.error(`[Analytics] Failed to track screen ${screenName}:`, error);
@@ -42,6 +45,7 @@ export const trackEvent = (
   eventName: string,
   properties?: Record<string, any>
 ) => {
+  if (!analyticsEnabled) return;
   try {
     CSQ.trackEvent(eventName, properties);
     console.log(`[Analytics] Event: ${eventName}`, properties ?? "");
@@ -55,8 +59,9 @@ export const trackEvent = (
  * @param identity Unique string — use the Supabase user UUID.
  */
 export const identifyUser = (identity: string) => {
+  if (!analyticsEnabled) return;
   try {
-    CSQ.trackIdentity(identity);
+    CSQ.identify(identity);
     console.log(`[Analytics] Identify: ${identity}`);
   } catch (error) {
     console.error("[Analytics] Failed to identify user:", error);

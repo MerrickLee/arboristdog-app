@@ -1,5 +1,6 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, Animated, Alert, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { TreeRingPaw, CheckIcon } from '../../components/ui/Icons';
@@ -18,9 +19,10 @@ const STEPS = [
 ];
 
 export default function AnalyzingScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { user } = useAuthStore();
-  const { deductCredit } = useCreditStore();
+  const { setCreditsRemaining } = useCreditStore();
   const { 
     capturedImage, 
     selectedTags, 
@@ -33,7 +35,6 @@ export default function AnalyzingScreen() {
   const pulseAnim = useState(new Animated.Value(1))[0];
 
   useTrackScreen('Analyzing');
-  trackEvent('analysis_started', { tag_count: selectedTags?.length ?? 0 });
 
   useEffect(() => {
     Animated.loop(
@@ -59,6 +60,7 @@ export default function AnalyzingScreen() {
 
     const startAnalysis = async () => {
       if (!user || !capturedImage) return;
+      trackEvent('analysis_started', { tag_count: selectedTags?.length ?? 0 });
 
       const response = await performAnalysis(user.id, capturedImage, {
         symptoms: selectedTags,
@@ -71,7 +73,7 @@ export default function AnalyzingScreen() {
         if (response.imageUrl) {
           setRemoteImageUrl(response.imageUrl);
         }
-        deductCredit();
+        if (typeof response.balance === 'number') setCreditsRemaining(response.balance);
         trackEvent('analysis_completed', {
           condition: response.result.condition_name,
           severity: response.result.severity,
@@ -94,7 +96,7 @@ export default function AnalyzingScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={{ flex: 1, backgroundColor: COLORS.canopyDark }} contentContainerStyle={[styles.container, { paddingTop: layout.headerPaddingTop, paddingBottom: layout.footerPaddingBottom }]}>
       <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseAnim }] }]}>
         <TreeRingPaw size={64} />
       </Animated.View>
@@ -117,13 +119,13 @@ export default function AnalyzingScreen() {
           </View>
         ))}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: COLORS.canopyDark,
     alignItems: 'center',
     justifyContent: 'center',
@@ -155,6 +157,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   stepText: {
+    flex: 1,
     fontSize: 14,
   },
   spinner: {

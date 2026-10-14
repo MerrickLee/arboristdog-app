@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -25,7 +26,10 @@ export const signInWithApple = async (): Promise<void> => {
     throw new Error('Apple Sign-In is not available on this device.');
   }
 
+  const nonce = Crypto.randomUUID();
+  const hashedNonce = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce);
   const credential = await AppleAuthentication.signInAsync({
+    nonce: hashedNonce,
     requestedScopes: [
       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
       AppleAuthentication.AppleAuthenticationScope.EMAIL,
@@ -39,11 +43,19 @@ export const signInWithApple = async (): Promise<void> => {
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'apple',
     token: credential.identityToken,
-    nonce: credential.authorizationCode ?? undefined,
+    nonce,
   });
 
   if (error) throw error;
 
+  // Apple supplies the name only on the first authorization.
+  const fullName = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(' ');
+  if (fullName) {
+    const { error: nameError } = await supabase.auth.updateUser({ data: { full_name: fullName } });
+    if (nameError) console.warn('Could not save Apple account name');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await supabase.from('profiles').update({ full_name: fullName }).eq('id', user.id);
+  }
   // On success, supabase.auth.onAuthStateChange in _layout.tsx fires automatically.
 };
 

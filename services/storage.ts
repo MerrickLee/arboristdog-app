@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { decode } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * Upload an image from a local URI to Supabase Storage

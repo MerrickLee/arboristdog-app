@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface LocationData {
+export interface LocationData {
   address: string;
   street?: string;
   city?: string;
@@ -15,7 +15,20 @@ export interface DiagnosisResult {
   confidence: number;
   severity: 'low' | 'moderate' | 'high';
   explanation: string;
-  actions: Array<{ priority: string; text: string; color?: string }>;
+  actions: { priority: string; text: string; color?: string }[];
+}
+
+export interface SavedDiagnosis {
+  id: string;
+  condition_name: string;
+  confidence: number;
+  severity: string;
+  image_url: string | null;
+  diagnosis_json: DiagnosisResult;
+  symptoms?: string[] | null;
+  description?: string | null;
+  location_json?: LocationData | null;
+  created_at: string;
 }
 
 interface DiagnosisState {
@@ -25,6 +38,9 @@ interface DiagnosisState {
   description: string;
   location: LocationData | null;
   result: DiagnosisResult | null;
+  historyPreview: SavedDiagnosis | null;
+  setHistoryPreview: (diagnosis: SavedDiagnosis | null) => void;
+  restoreDiagnosis: (diagnosis: SavedDiagnosis) => void;
   
   setCapturedImage: (uri: string) => void;
   setRemoteImageUrl: (url: string) => void;
@@ -41,6 +57,16 @@ export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   description: '',
   location: null,
   result: null,
+  historyPreview: null,
+  setHistoryPreview: (historyPreview) => set({ historyPreview }),
+  restoreDiagnosis: (diagnosis) => set({
+    capturedImage: null,
+    remoteImageUrl: diagnosis.image_url,
+    result: diagnosis.diagnosis_json,
+    selectedTags: diagnosis.symptoms || [],
+    description: diagnosis.description || '',
+    location: diagnosis.location_json || null,
+  }),
 
   setCapturedImage: (uri) => set({ capturedImage: uri }),
   setRemoteImageUrl: (url) => set({ remoteImageUrl: url }),

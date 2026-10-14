@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { LogBox } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AdaptiveExperience } from '../components/layout/AdaptiveExperience';
 import { useAuthStore } from '../stores/authStore';
 import { useCreditStore } from '../stores/creditStore';
+import { useDiagnosisStore } from '../stores/diagnosisStore';
 import { initAnalytics, trackEvent, identifyUser } from '../services/analytics';
-import { initPurchases } from '../services/purchases';
+import { identifyPurchases, clearPurchaseIdentity } from '../services/purchases';
 import { supabase } from '../services/supabase';
+import { AppointmentUpdates } from '../components/appointments/AppointmentUpdates';
 
 // Suppress RevenueCat offerings error in simulator (no StoreKit config via CLI builds)
 LogBox.ignoreLogs(['[RevenueCat]', 'Error fetching offerings']);
@@ -21,7 +25,7 @@ export default function RootLayout() {
     setIsMounted(true);
     // Initialize external services
     initAnalytics();
-    initPurchases();
+
 
     // Track that the app was opened
     trackEvent('app_start');
@@ -34,6 +38,10 @@ export default function RootLayout() {
       if (session?.user) {
         fetchProfile(session.user.id);
       } else {
+        setCreditsRemaining(0);
+        useDiagnosisStore.getState().resetSession();
+        useDiagnosisStore.getState().setHistoryPreview(null);
+        clearPurchaseIdentity().catch(console.warn);
         setUser(null);
       }
     });
@@ -74,8 +82,15 @@ export default function RootLayout() {
       setUser(data);
       // Identify the user in Heap so all events are attributed to them
       identifyUser(userId);
+      identifyPurchases(userId).catch(console.warn);
       // Also fetch credits
       fetchCredits(userId);
+      supabase.functions.invoke('lookup-customer').then(({ data: lookup, error: lookupError }) => {
+        const currentUser = useAuthStore.getState().user;
+        if (!lookupError && lookup?.isAlmsteadCustomer && currentUser?.id === userId) {
+          setUser({ ...currentUser, is_almstead_customer: true });
+        }
+      }).catch(console.warn);
     } else {
       console.error("Error fetching profile:", error);
       setUser(null);
@@ -117,5 +132,10 @@ export default function RootLayout() {
 
   if (!isMounted || isLoading) return null;
 
-  return <Slot />;
+  return (
+    <SafeAreaProvider>
+      <AdaptiveExperience><Slot /></AdaptiveExperience>
+      <AppointmentUpdates userId={user?.id} />
+    </SafeAreaProvider>
+  );
 }

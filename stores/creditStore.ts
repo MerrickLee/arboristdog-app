@@ -8,7 +8,7 @@ interface CreditState {
 }
 
 export const useCreditStore = create<CreditState>((set) => ({
-  creditsRemaining: 3, // Default for new users
+  creditsRemaining: 0, // Loaded from the server after sign-in
   setCreditsRemaining: (credits) => set({ creditsRemaining: credits }),
   decrementCredits: () => set((state) => ({ creditsRemaining: Math.max(0, state.creditsRemaining - 1) })),
   addCredits: (amount) => set((state) => ({ creditsRemaining: state.creditsRemaining + amount })),

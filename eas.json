@@ -21,10 +21,18 @@
       "autoIncrement": true,
       "env": {
         "APP_ENV": "production"
-      }
+      },
+      "environment": "production",
+      "distribution": "store"
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6795171041",
+        "appleTeamId": "8NH64CG58D",
+        "appleId": "mlee@almstead.com"
+      }
+    }
   }
 }

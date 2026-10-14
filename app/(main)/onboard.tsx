@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Alert, Platform } from 'react-native';
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Alert, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { Button } from '../../components/ui/Button';
@@ -8,28 +9,31 @@ import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../services/supabase';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
 import { trackEvent } from '../../services/analytics';
+import { withTimeout } from '../../utils/withTimeout';
 
 export default function OnboardScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
   const { user, setHasOnboarded } = useAuthStore();
 
+  const [saving, setSaving] = useState(false);
   useTrackScreen('Onboarding');
 
   const handleNext = async () => {
     // Check if the user signed in with Apple's Hide My Email
-    const isPrivateRelay = user?.email?.toLowerCase().includes('privaterelay.appleid.com');
+    const isPrivateRelay = user?.email?.toLowerCase().endsWith('@privaterelay.appleid.com');
 
     if (isPrivateRelay) {
       Alert.alert(
         "Private Email Detected",
-        "You used Apple's 'Hide My Email'. If you are an Almstead customer, we need your real email to link your account and unlock free unlimited scans.\n\nWould you like to enter your real email?",
+        "You used Apple's 'Hide My Email'. If you are an Almstead customer, you can optionally verify your Almstead account email to link your account and unlock free unlimited scans.\n\nWould you like to enter your real email?",
         [
           {
             text: "Keep Private",
-            onPress: () => completeOnboarding(user.email)
+            onPress: () => completeOnboarding(user?.email || '')
           },
           {
-            text: "Use Real Email",
+            text: "Verify Customer Email",
             onPress: () => promptForRealEmail()
           }
         ]
@@ -42,7 +46,7 @@ export default function OnboardScreen() {
   const promptForRealEmail = () => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
-        "Enter Real Email",
+        "Verify Customer Email",
         "Please enter the email associated with your Almstead account to unlock free unlimited scans:",
         [
           {
@@ -52,8 +56,8 @@ export default function OnboardScreen() {
           },
           {
             text: "Link Account",
-            onPress: async (enteredEmail) => {
-              if (!enteredEmail || !enteredEmail.includes('@')) {
+            onPress: async (enteredEmail?: string) => {
+              if (!enteredEmail || ! /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(enteredEmail.trim())) {
                 Alert.alert("Invalid Email", "Please enter a valid email address.", [
                   { text: "Try Again", onPress: () => promptForRealEmail() },
                   { text: "Cancel", onPress: () => completeOnboarding(user?.email || '') }
@@ -72,28 +76,41 @@ export default function OnboardScreen() {
   };
 
   const completeOnboarding = async (finalEmail: string) => {
-    trackEvent('onboarding_completed');
-    if (user?.id) {
-      const updates: any = { has_onboarded: true };
+    if (!user || saving) return;
+    setSaving(true);
+    const controller = new AbortController();
+    try {
       if (finalEmail && finalEmail !== user.email) {
-        updates.email = finalEmail;
+        const { error } = await withTimeout(
+          supabase.auth.updateUser({ email: finalEmail }),
+          15000,
+          'Email verification is taking too long. Please check your connection and try again.',
+        );
+        if (error) throw error;
+        Alert.alert('Verify your email', 'Check your inbox and follow the confirmation links. Your private email stays in use until verification finishes. Customer benefits are granted after verification.');
       }
-
-      await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
-
-      // Update the local state
-      useAuthStore.getState().setUser({ ...user, ...updates });
-
-      // Run customer lookup in background
-      supabase.functions.invoke('lookup-customer').catch((err) => {
-        console.log("Customer lookup skipped or failed:", err);
-      });
-    }
-    setHasOnboarded(true);
-    router.replace('/(main)/capture');
+      const { error } = await withTimeout(
+        supabase.from('profiles').update({ has_onboarded: true }).eq('id', user.id).abortSignal(controller.signal),
+        15000,
+        'Saving is taking too long. Please check your connection and try again.',
+        () => controller.abort(),
+      );
+      if (error) throw error;
+      setHasOnboarded(true);
+      trackEvent('onboarding_completed');
+      router.replace('/(main)/onboard-location');
+      if (finalEmail === user.email) {
+        // Eligibility is optional here: do not hold navigation for this request.
+        supabase.functions.invoke('lookup-customer').then(({ data, error: lookupError }) => {
+          const currentUser = useAuthStore.getState().user;
+          if (!lookupError && data?.isAlmsteadCustomer && currentUser?.id === user.id) {
+            useAuthStore.getState().setUser({ ...currentUser, is_almstead_customer: true });
+          }
+        }).catch(console.warn);
+      }
+    } catch (error) {
+      Alert.alert('Unable to save', error instanceof Error ? error.message : 'Please try again.');
+    } finally { setSaving(false); }
   };
 
   const steps = [
@@ -105,8 +122,8 @@ export default function OnboardScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header} />
-      <View style={styles.content}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]} />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         <Text style={styles.title}>How it works</Text>
         
         {steps.map((step, i) => (
@@ -120,12 +137,12 @@ export default function OnboardScreen() {
             </View>
           </View>
         ))}
-      </View>
+      </ScrollView>
       
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <ProgressDots current={0} total={4} />
         <View style={{ marginTop: 20 }}>
-          <Button onPress={handleNext}>Get Started</Button>
+          <Button onPress={handleNext} disabled={saving}>{saving ? 'Saving...' : 'Get Started'}</Button>
         </View>
       </View>
     </View>
@@ -151,7 +168,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 32,
     justifyContent: 'center',
   },

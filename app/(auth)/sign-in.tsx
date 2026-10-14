@@ -1,3 +1,4 @@
+import { useAdaptiveLayout } from '../../hooks/useAdaptiveLayout';
 import React, { useState } from 'react';
 import {
   View,
@@ -15,7 +16,6 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/theme';
 import { TreeRingPaw, BackArrow } from '../../components/ui/Icons';
 import { Button } from '../../components/ui/Button';
-import { useAuthStore } from '../../stores/authStore';
 import { supabase } from '../../services/supabase';
 import { signInWithApple, signInWithGoogle } from '../../services/auth';
 import { useTrackScreen } from '../../hooks/useTrackScreen';
@@ -36,8 +36,8 @@ const GoogleIcon = () => (
 );
 
 export default function SignInScreen() {
+  const layout = useAdaptiveLayout();
   const router = useRouter();
-  const { setUser } = useAuthStore();
   const [mode, setMode] = useState<null | 'manual'>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -109,7 +109,7 @@ export default function SignInScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
           <TouchableOpacity style={styles.backButton} onPress={() => setMode(null)}>
             <BackArrow />
           </TouchableOpacity>
@@ -160,7 +160,7 @@ export default function SignInScreen() {
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </Text>
         </ScrollView>
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
           <Button onPress={handleEmailAuth}>
             {loading ? 'Creating account...' : 'Create Account'}
           </Button>
@@ -172,13 +172,13 @@ export default function SignInScreen() {
   // ── Main sign-in view ───────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: layout.headerPaddingTop }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <BackArrow />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         <View style={styles.logoContainer}>
           <TreeRingPaw size={60} />
         </View>
@@ -253,9 +253,9 @@ export default function SignInScreen() {
             Sign up with email
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: layout.footerPaddingBottom }]}>
         <Text style={styles.termsTextCenter}>
           By continuing, you agree to our Terms of Service and Privacy Policy.
         </Text>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 32,
     justifyContent: 'center',
   },
