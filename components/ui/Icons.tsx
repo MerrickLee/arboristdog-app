@@ -106,3 +106,19 @@ export const GalleryIcon = ({ size = 18, color = '#fff' }) => (
     <Path d="M21 15l-5-5L5 21" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
+
+export const CalendarIcon = ({ size = 18, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={3} y={5} width={18} height={16} rx={3} stroke={color} strokeWidth={2} />
+    <Path d="M3 10h18M8 3v4M16 3v4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+  </Svg>
+);
+
+export const TruckIcon = ({ size = 18, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M2 6h11v10H2zM13 9h4l3 3v4h-7z" stroke={color} strokeWidth={2} strokeLinejoin="round" />
+    <Circle cx={6.5} cy={17.5} r={1.8} fill={color} />
+    <Circle cx={16.5} cy={17.5} r={1.8} fill={color} />
+  </Svg>
+);
+
